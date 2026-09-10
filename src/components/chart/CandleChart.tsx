@@ -284,16 +284,23 @@ export function CandleChart({ symbol }: { symbol: string }) {
       // minMove = the instrument's real tick size (not 1/10^precision), so the axis + crosshair
       // snap to valid ticks (e.g. .00/.25/.50/.75) instead of showing impossible prices like 7530.11.
       priceFormat: { type: "price", precision, minMove: tickSize },
-      // Extend the auto-fit range to include any working-order levels (entry/SL/TP),
-      // so fitting the price scale never leaves a placed bracket off-screen.
+      // Extend the auto-fit range to include working-order levels AND guarantee a
+      // non-zero span. A single flat candle (open=high=low=close) makes lightweight-charts
+      // draw an empty Y-axis — the "frozen blank chart" on NQ/YM/GC.
       autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
         const res = original();
-        const levels = orderLevelsRef.current;
-        if (!res || !res.priceRange || levels.length === 0) return res;
+        if (!res?.priceRange) return res;
         let { minValue, maxValue } = res.priceRange;
+        const levels = orderLevelsRef.current;
         for (const lv of levels) {
           minValue = Math.min(minValue, lv);
           maxValue = Math.max(maxValue, lv);
+        }
+        const minSpan = tickSize * 16;
+        if (!(maxValue > minValue) || maxValue - minValue < minSpan) {
+          const mid = Number.isFinite(minValue) ? (minValue + maxValue) / 2 : 0;
+          minValue = mid - minSpan / 2;
+          maxValue = mid + minSpan / 2;
         }
         return { ...res, priceRange: { minValue, maxValue } };
       },
@@ -425,13 +432,15 @@ export function CandleChart({ symbol }: { symbol: string }) {
         // Keep at least a few bars if everything was flat (still better than empty).
         if (start >= valid.length && valid.length) start = Math.max(0, valid.length - 30);
         const candles = valid.slice(start);
-        const candleData: CandlestickData<UTCTimestamp>[] = candles.map((c) => ({
-          time: c.time as UTCTimestamp,
-          open: snap(c.open),
-          high: snap(c.high),
-          low: snap(c.low),
-          close: snap(c.close),
-        }));
+        const candleData: CandlestickData<UTCTimestamp>[] = candles.map((c) => {
+          const open = snap(c.open);
+          const close = snap(c.close);
+          let high = snap(c.high);
+          let low = snap(c.low);
+          high = Math.max(high, open, close);
+          low = Math.min(low, open, close);
+          return { time: c.time as UTCTimestamp, open, high, low, close };
+        });
         const volDataRaw: HistogramData<UTCTimestamp>[] = candles.map((c) => ({
           time: c.time as UTCTimestamp,
           value: c.volume,
@@ -439,23 +448,18 @@ export function CandleChart({ symbol }: { symbol: string }) {
         }));
         // Carry the last close forward across short empty stretches so the chart is continuous.
         const { candles: candleData2, vols: volData } = fillGaps(candleData, volDataRaw, resolution);
-        candleRef.current.setData(candleData2);
-        volumeRef.current.setData(volData);
+        try {
+          candleRef.current.setData(candleData2);
+          volumeRef.current.setData(volData);
+        } catch (err) {
+          console.warn("[chart] setData failed:", (err as Error).message);
+          return;
+        }
         barCountRef.current = candleData2.length;
         lastCandleRef.current = candleData2[candleData2.length - 1] ?? null;
         lastVolumeRef.current = volData[volData.length - 1] ?? null;
         if (showSpinner && !framed) {
-          let lo = Infinity;
-          let hi = -Infinity;
-          for (const c of candleData2) {
-            if (c.low < lo) lo = c.low;
-            if (c.high > hi) hi = c.high;
-          }
-          showDefaultView(
-            candleData2.length,
-            Number.isFinite(lo) ? lo : undefined,
-            Number.isFinite(hi) ? hi : undefined,
-          );
+          showDefaultView(candleData2.length);
           // Completion check uses REAL bar count (not synthetic fills) so a thin feed still deepens.
           if (candleData.length >= target * 0.9 || candleData.length >= target - 1) framed = true;
         }
@@ -556,7 +560,9 @@ export function CandleChart({ symbol }: { symbol: string }) {
   // Update the forming candle from the live quote.
   const quote = useMarketStore((s) => s.quotes[symbol]);
   useEffect(() => {
-    if (!quote || !candleRef.current || loading) return;
+    // Allow quotes even while history is loading so NQ/YM/GC don't sit frozen
+    // during the Candle-wait; history setData will replace a thin seed cleanly.
+    if (!quote || !candleRef.current) return;
     const price = Math.round(quote.price / tickSize) * tickSize;
     // Ignore quotes with no real price (e.g. a stale/empty snapshot when the market is
     // closed). Building a bar from one yields a NaN/zero-price candle that renders as an
@@ -586,14 +592,25 @@ export function CandleChart({ symbol }: { symbol: string }) {
       }
       next = { time: bucket, open: price, high: price, low: price, close: price };
       nextVol = { time: bucket, value: size, color: upColor }; // new bar opens flat → up tone
-      // First bar on an empty series: setData (update() alone can fail to paint).
+      // First bar on an empty series: setData once. Never replace a loaded history
+      // with a single point (that caused the blank Y-axis / single "10:41" chart).
       if (!last) {
-        candleRef.current.setData([next]);
-        volumeRef.current?.setData([nextVol]);
+        if (barCountRef.current > 0) {
+          // History already painted but lastCandleRef was cleared — append via update.
+          try {
+            candleRef.current.update(next);
+            volumeRef.current?.update(nextVol);
+          } catch {
+            /* series not ready */
+          }
+        } else {
+          candleRef.current.setData([next]);
+          volumeRef.current?.setData([nextVol]);
+          barCountRef.current = 1;
+          showDefaultView(1);
+        }
         lastCandleRef.current = next;
         lastVolumeRef.current = nextVol;
-        barCountRef.current = 1;
-        showDefaultView(1, price, price);
         return;
       }
     } else {
@@ -610,9 +627,13 @@ export function CandleChart({ symbol }: { symbol: string }) {
     }
     lastCandleRef.current = next;
     lastVolumeRef.current = nextVol;
-    candleRef.current.update(next);
-    volumeRef.current?.update(nextVol);
-  }, [quote, resolution, loading, tickSize, showDefaultView]);
+    try {
+      candleRef.current.update(next);
+      volumeRef.current?.update(nextVol);
+    } catch {
+      /* ignore transient update errors during remount */
+    }
+  }, [quote, resolution, tickSize, showDefaultView]);
 
   // Draw / clear the dashed order line while a ticket is open.
   useEffect(() => {

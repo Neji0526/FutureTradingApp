@@ -82,10 +82,12 @@ export const useMarketStore = create<MarketState>((set, get) => ({
       // Model B: no shared market feed — poll the selected symbol via the user's key.
       get().watchByo(get().selectedSymbol);
     } else {
-      // Subscribe to the selected symbol's quotes. Position symbols are subscribed
-      // by TraderProvider so their P&L stays live. (Subscriptions are
-      // subscriber-driven, so the backend only streams what's actually shown.)
-      ws.subscribe("quotes", get().selectedSymbol);
+      // Subscribe every instrument so switching NQ/YM/GC is live immediately
+      // (and live-bar history stays warm). Selected symbol alone left those
+      // charts frozen until the first post-switch tick arrived.
+      for (const inst of INSTRUMENTS) {
+        ws.subscribe("quotes", inst.symbol);
+      }
     }
 
     void get().loadInstruments();
