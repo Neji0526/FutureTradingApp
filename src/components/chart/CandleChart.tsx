@@ -33,10 +33,6 @@ const RESOLUTIONS = [
   { label: "1D", seconds: 86400 },
 ];
 
-// Minimum bars before we reveal the chart (hide the loading spinner). dxFeed often
-// has quote entitlement without Candle history — charts start from a few live bars.
-const REVEAL_MIN_BARS = 1;
-
 // How many bars of history to request per resolution. 1m is sized to ~7 trading
 // days (CME trades ~23h/day ≈ 1,380 one-minute bars/day); coarser frames cover
 // proportionally longer spans. The backend widens its fetch window to match.
@@ -281,6 +277,8 @@ export function CandleChart({ symbol }: { symbol: string }) {
       borderVisible: false,
       wickUpColor: c.up,
       wickDownColor: c.down,
+      priceLineVisible: true,
+      lastValueVisible: true,
       // minMove = the instrument's real tick size (not 1/10^precision), so the axis + crosshair
       // snap to valid ticks (e.g. .00/.25/.50/.75) instead of showing impossible prices like 7530.11.
       priceFormat: { type: "price", precision, minMove: tickSize },
@@ -377,128 +375,108 @@ export function CandleChart({ symbol }: { symbol: string }) {
     chart.priceScale("right").applyOptions({ autoScale: true });
   }, []);
 
+  // Paint helper shared by initial load + live poll. Always prefers server bars so
+  // NQ/YM/GC (quote-heavy) look like ES instead of a single flat price line.
+  const paintCandles = useCallback(
+    (
+      raw: { time: number; open: number; high: number; low: number; close: number; volume: number }[],
+      opts?: { fit?: boolean; scroll?: boolean },
+    ) => {
+      if (!candleRef.current || !volumeRef.current || !raw.length) return false;
+      const snap = (p: number) => Math.round(p / tickSize) * tickSize;
+      const valid = raw.filter(
+        (c) =>
+          Number.isFinite(c.open) &&
+          Number.isFinite(c.high) &&
+          Number.isFinite(c.low) &&
+          Number.isFinite(c.close) &&
+          c.low > 0,
+      );
+      if (!valid.length) return false;
+
+      // Keep every bar — do NOT strip flats. Thin live feeds (NQ/YM) start with
+      // quote-built bars that can look flat for a few seconds; stripping them left
+      // the chart on a single price line at one timestamp (the bug in screenshots).
+      const candleData: CandlestickData<UTCTimestamp>[] = valid.map((c) => {
+        const open = snap(c.open);
+        const close = snap(c.close);
+        let high = snap(c.high);
+        let low = snap(c.low);
+        high = Math.max(high, open, close);
+        low = Math.min(low, open, close);
+        // Guarantee a visible body/wick even on a one-tick bar so the series
+        // never collapses to an invisible flat line on the price axis.
+        if (high === low) {
+          high = high + tickSize;
+          low = low - tickSize;
+        }
+        return { time: c.time as UTCTimestamp, open, high, low, close };
+      });
+      const volDataRaw: HistogramData<UTCTimestamp>[] = valid.map((c, i) => ({
+        time: c.time as UTCTimestamp,
+        value: c.volume,
+        color: (candleData[i]!.close >= candleData[i]!.open) ? "#16c78455" : "#ea394355",
+      }));
+      const { candles: candleData2, vols: volData } = fillGaps(candleData, volDataRaw, resolution);
+      try {
+        candleRef.current.setData(candleData2);
+        volumeRef.current.setData(volData);
+      } catch (err) {
+        console.warn("[chart] setData failed:", (err as Error).message);
+        return false;
+      }
+      barCountRef.current = candleData2.length;
+      lastCandleRef.current = candleData2[candleData2.length - 1] ?? null;
+      lastVolumeRef.current = volData[volData.length - 1] ?? null;
+      if (opts?.fit) showDefaultView(candleData2.length);
+      if (opts?.scroll !== false) chartRef.current?.timeScale().scrollToRealTime();
+      return true;
+    },
+    [tickSize, resolution, showDefaultView],
+  );
+
   // Load history for the current symbol/resolution, re-polling a few times until
-  // the backend's background cache warms (its Historical-data hop can be slow/
-  // rate-limited from some hosts). So the FIRST response can be thin (live bars
-  // only); each response still renders, so the chart is never blank and fills in
-  // on its own. `showSpinner` is true for the initial / symbol-change load and
-  // false for a silent refresh (e.g. backfilling after the tab regains focus).
+  // the backend's live-bar buffer has something to show.
   const loadHistory = useCallback(
     (showSpinner: boolean) => {
-      loadCleanupRef.current?.(); // cancel any in-flight load first
+      loadCleanupRef.current?.();
       let cancelled = false;
       let timer: ReturnType<typeof setTimeout> | null = null;
       let attempt = 0;
       let bestCount = 0;
-      let noGrowth = 0; // consecutive polls that added no bars (deep backfill has landed)
-      let framed = false; // recent-window framing locked once the deep history is in
+      let noGrowth = 0;
+      let fitted = false;
       const target = HISTORY_COUNT[resolution] ?? DEFAULT_HISTORY_COUNT;
       if (showSpinner) setLoading(true);
       setTicket(null);
 
-      // Symbol/resolution change (spinner load): drop the PREVIOUS instrument's
-      // bars at once. Otherwise its (wrong-price) candles and locked price scale
-      // linger on-screen until the new history arrives over the slow Historical
-      // hop — e.g. switching to NQ briefly shows ES's ~7560 range. A silent
-      // refresh (tab refocus) must NOT clear — that would blank a good chart.
       if (showSpinner) {
-        candleRef.current?.setData([]);
-        volumeRef.current?.setData([]);
-        lastCandleRef.current = null;
-        lastVolumeRef.current = null;
-        // Reset scale + format for the new instrument before bars arrive.
+        // Do NOT clear existing series here — clearing caused a blank/flat chart
+        // whenever history was briefly empty. New data replaces via setData.
         candleRef.current?.applyOptions({
           priceFormat: { type: "price", precision, minMove: tickSize },
         });
         chartRef.current?.priceScale("right").applyOptions({ autoScale: true });
       }
 
-      const render = (raw: { time: number; open: number; high: number; low: number; close: number; volume: number }[]) => {
-        if (!candleRef.current || !volumeRef.current) return;
-        // Drop invalid bars. Also drop leading flat zero-volume pads — they stretch the
-        // time axis so the few real live candles become invisible hairlines (blank chart
-        // on YM/NQ/GC while ES still showed a small cluster on the far right).
-        const snap = (p: number) => Math.round(p / tickSize) * tickSize;
-        const valid = raw.filter(
-          (c) => Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close) && c.low > 0,
-        );
-        let start = 0;
-        while (start < valid.length) {
-          const c = valid[start]!;
-          const flat = c.open === c.high && c.high === c.low && c.low === c.close;
-          if (!flat || (c.volume ?? 0) > 0) break;
-          start += 1;
-        }
-        // Keep at least a few bars if everything was flat (still better than empty).
-        if (start >= valid.length && valid.length) start = Math.max(0, valid.length - 30);
-        const candles = valid.slice(start);
-        const candleData: CandlestickData<UTCTimestamp>[] = candles.map((c) => {
-          const open = snap(c.open);
-          const close = snap(c.close);
-          let high = snap(c.high);
-          let low = snap(c.low);
-          high = Math.max(high, open, close);
-          low = Math.min(low, open, close);
-          return { time: c.time as UTCTimestamp, open, high, low, close };
-        });
-        const volDataRaw: HistogramData<UTCTimestamp>[] = candles.map((c) => ({
-          time: c.time as UTCTimestamp,
-          value: c.volume,
-          color: c.close >= c.open ? "#16c78455" : "#ea394355",
-        }));
-        // Carry the last close forward across short empty stretches so the chart is continuous.
-        const { candles: candleData2, vols: volData } = fillGaps(candleData, volDataRaw, resolution);
-        try {
-          candleRef.current.setData(candleData2);
-          volumeRef.current.setData(volData);
-        } catch (err) {
-          console.warn("[chart] setData failed:", (err as Error).message);
-          return;
-        }
-        barCountRef.current = candleData2.length;
-        lastCandleRef.current = candleData2[candleData2.length - 1] ?? null;
-        lastVolumeRef.current = volData[volData.length - 1] ?? null;
-        if (showSpinner && !framed) {
-          showDefaultView(candleData2.length);
-          // Completion check uses REAL bar count (not synthetic fills) so a thin feed still deepens.
-          if (candleData.length >= target * 0.9 || candleData.length >= target - 1) framed = true;
-        }
-      };
-
-      // Best response so far, held back (not painted) until we're ready to reveal —
-      // so the sparse "live bars only" first frames never show behind the spinner.
-      let latest: Parameters<typeof render>[0] = [];
       const poll = async () => {
         attempt += 1;
         const candles = await getWsClient()
           .getHistory(symbol, resolution, target)
           .catch(() => [] as Awaited<ReturnType<ReturnType<typeof getWsClient>["getHistory"]>>);
         if (cancelled) return;
-        // Keep the most complete response so far — avoids flicker if a retry briefly
-        // returns fewer bars. Track no-growth polls so we can stop once the deep
-        // Historical window (warmed in the background) has fully landed.
         if (candles.length && candles.length >= bestCount) {
           noGrowth = candles.length > bestCount ? 0 : noGrowth + 1;
           bestCount = candles.length;
-          latest = candles;
+          const ok = paintCandles(candles, { fit: showSpinner && !fitted, scroll: true });
+          if (ok && showSpinner) fitted = true;
         } else {
           noGrowth += 1;
         }
-        // Reveal once a real backfill has landed, OR after a few attempts so a slow/
-        // thin Historical hop still surfaces something instead of spinning forever.
-        // During a spinner load we DON'T paint before reveal, so the chart area stays
-        // blank (not a 1–2 bar sliver) behind the overlay. A silent refresh has no
-        // spinner, so it paints each response immediately as before.
-        const reveal = bestCount >= REVEAL_MIN_BARS || attempt >= 3;
-        if (latest.length && (!showSpinner || reveal)) render(latest);
-        if (reveal) setLoading(false);
-        // Keep polling while the deep history is still warming in the background: the
-        // backend serves the shallow cache first and deepens it asynchronously, so the
-        // first responses are short. Stop once we're near the requested depth, growth
-        // has stalled (deep data landed or none more exists), or we hit the cap (~35s).
-        const enough = bestCount >= target * 0.9;
-        if (!enough && noGrowth < 3 && attempt < 12) {
-          timer = setTimeout(poll, attempt < 4 ? 2000 : 4000);
+        if (bestCount >= 1 || attempt >= 3) setLoading(false);
+        const enough = bestCount >= Math.min(target * 0.9, 30);
+        if (!enough && noGrowth < 4 && attempt < 15) {
+          timer = setTimeout(poll, attempt < 5 ? 1500 : 3000);
         }
       };
 
@@ -508,7 +486,7 @@ export function CandleChart({ symbol }: { symbol: string }) {
       };
       void poll();
     },
-    [symbol, resolution, showDefaultView, tickSize],
+    [symbol, resolution, showDefaultView, tickSize, precision, paintCandles],
   );
 
   // Initial load + whenever symbol/resolution changes.
@@ -545,95 +523,113 @@ export function CandleChart({ symbol }: { symbol: string }) {
     }
   }, [wsStatus, loadHistory]);
 
-  // Self-heal gaps over time. A gap can form when neither side recorded bars for a
-  // span (e.g. a brief backend live-stream drop). The backend's Historical backfill
-  // fills that window within the following minutes, so a low-frequency silent re-pull
-  // picks up the healed data and closes the gap — no user action needed. Gated on tab
-  // visibility (the visibilitychange handler covers the return-to-foreground case).
+  // Live sync: pull server live-bars every 2s and paint. This is the source of
+  // truth for NQ/MNQ/YM/GC (and ES) so the chart keeps moving even if a WS quote
+  // tick is missed — matches what /api/history already streams correctly.
   useEffect(() => {
-    const id = setInterval(() => {
-      if (document.visibilityState === "visible") loadHistory(false);
-    }, 60_000);
-    return () => clearInterval(id);
-  }, [loadHistory]);
+    let cancelled = false;
+    const sync = async () => {
+      if (document.visibilityState !== "visible") return;
+      const candles = await getWsClient()
+        .getHistory(symbol, resolution, HISTORY_COUNT[resolution] ?? DEFAULT_HISTORY_COUNT)
+        .catch(() => [] as { time: number; open: number; high: number; low: number; close: number; volume: number }[]);
+      if (cancelled || !candles.length) return;
+      paintCandles(candles, { fit: barCountRef.current < 2, scroll: true });
+      setLoading(false);
+    };
+    void sync();
+    const id = setInterval(() => void sync(), 2_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [symbol, resolution, paintCandles]);
 
-  // Update the forming candle from the live quote.
-  const quote = useMarketStore((s) => s.quotes[symbol]);
+  // Live-stream the forming candle from WS quotes between history polls.
   useEffect(() => {
-    // Allow quotes even while history is loading so NQ/YM/GC don't sit frozen
-    // during the Candle-wait; history setData will replace a thin seed cleanly.
-    if (!quote || !candleRef.current) return;
-    const price = Math.round(quote.price / tickSize) * tickSize;
-    // Ignore quotes with no real price (e.g. a stale/empty snapshot when the market is
-    // closed). Building a bar from one yields a NaN/zero-price candle that renders as an
-    // empty slot — that's what opened the weekend "gap" between Fri close and Sun open.
-    if (!Number.isFinite(price) || price <= 0) return;
-    const bucket = (Math.floor(quote.ts / 1000 / resolution) * resolution) as UTCTimestamp;
-    const last = lastCandleRef.current;
+    const applyQuote = (q: { price: number; bid?: number; ask?: number; lastSize?: number; ts: number }) => {
+      if (!candleRef.current) return;
+      // Never seed a 1-bar series from quotes alone — that drew the full-width
+      // flat price line at a single timestamp. Wait for history paint first.
+      if (barCountRef.current < 1 || !lastCandleRef.current) return;
 
-    const size = quote.lastSize ?? 0;
-    const upColor = "#16c78455";
-    const downColor = "#ea394355";
+      const mid =
+        q.bid != null && q.ask != null && q.bid > 0 && q.ask > 0
+          ? (q.bid + q.ask) / 2
+          : q.price;
+      const price = Math.round(mid / tickSize) * tickSize;
+      if (!Number.isFinite(price) || price <= 0) return;
 
-    let next: CandlestickData<UTCTimestamp>;
-    let nextVol: HistogramData<UTCTimestamp>;
-    if (!last || bucket > (last.time as number)) {
-      // A new bucket opened. If buckets were skipped (no trades), carry the last close
-      // forward as flat bars across the gap — but only short gaps (cap as in fillGaps).
-      if (last) {
+      const bucket = (Math.floor(q.ts / 1000 / resolution) * resolution) as UTCTimestamp;
+      const last = lastCandleRef.current;
+      const size = q.lastSize ?? 0;
+      const upColor = "#16c78455";
+      const downColor = "#ea394355";
+
+      let next: CandlestickData<UTCTimestamp>;
+      let nextVol: HistogramData<UTCTimestamp>;
+
+      if (bucket > (last.time as number)) {
         const missing = (bucket - (last.time as number)) / resolution - 1;
         if (missing > 0 && missing <= GAP_FILL_MAX_BARS) {
           for (let k = 1; k <= missing; k++) {
             const t = (last.time as number) + k * resolution;
-            candleRef.current.update(flatCandle(t, last.close));
-            volumeRef.current?.update({ time: t as UTCTimestamp, value: 0, color: FLAT_VOL_COLOR });
+            try {
+              candleRef.current.update(flatCandle(t, last.close));
+              volumeRef.current?.update({ time: t as UTCTimestamp, value: 0, color: FLAT_VOL_COLOR });
+            } catch {
+              /* ignore */
+            }
           }
         }
-      }
-      next = { time: bucket, open: price, high: price, low: price, close: price };
-      nextVol = { time: bucket, value: size, color: upColor }; // new bar opens flat → up tone
-      // First bar on an empty series: setData once. Never replace a loaded history
-      // with a single point (that caused the blank Y-axis / single "10:41" chart).
-      if (!last) {
-        if (barCountRef.current > 0) {
-          // History already painted but lastCandleRef was cleared — append via update.
-          try {
-            candleRef.current.update(next);
-            volumeRef.current?.update(nextVol);
-          } catch {
-            /* series not ready */
-          }
-        } else {
-          candleRef.current.setData([next]);
-          volumeRef.current?.setData([nextVol]);
-          barCountRef.current = 1;
-          showDefaultView(1);
-        }
-        lastCandleRef.current = next;
-        lastVolumeRef.current = nextVol;
+        next = { time: bucket, open: price, high: Math.max(price, price + tickSize), low: Math.min(price, price - tickSize), close: price };
+        nextVol = { time: bucket, value: size, color: upColor };
+        barCountRef.current += 1;
+      } else if (bucket < (last.time as number)) {
+        // Stale quote — ignore so we don't yank the live edge backwards.
         return;
+      } else {
+        next = {
+          time: last.time,
+          open: last.open,
+          high: Math.max(last.high, price),
+          low: Math.min(last.low, price),
+          close: price,
+        };
+        if (next.high === next.low) {
+          next.high = next.close + tickSize;
+          next.low = next.close - tickSize;
+        }
+        const prevVol = lastVolumeRef.current?.time === last.time ? (lastVolumeRef.current?.value ?? 0) : 0;
+        nextVol = {
+          time: last.time,
+          value: prevVol + size,
+          color: price >= next.open ? upColor : downColor,
+        };
       }
-    } else {
-      next = {
-        time: last.time,
-        open: last.open,
-        high: Math.max(last.high, price),
-        low: Math.min(last.low, price),
-        close: price,
-      };
-      // Accumulate this minute's traded size into the forming volume bar.
-      const prevVol = lastVolumeRef.current?.time === last.time ? (lastVolumeRef.current?.value ?? 0) : 0;
-      nextVol = { time: last.time, value: prevVol + size, color: price >= next.open ? upColor : downColor };
-    }
-    lastCandleRef.current = next;
-    lastVolumeRef.current = nextVol;
-    try {
-      candleRef.current.update(next);
-      volumeRef.current?.update(nextVol);
-    } catch {
-      /* ignore transient update errors during remount */
-    }
-  }, [quote, resolution, tickSize, showDefaultView]);
+
+      lastCandleRef.current = next;
+      lastVolumeRef.current = nextVol;
+      try {
+        candleRef.current.update(next);
+        volumeRef.current?.update(nextVol);
+        chartRef.current?.timeScale().scrollToRealTime();
+      } catch {
+        /* ignore transient update errors during remount */
+      }
+    };
+
+    const seed = useMarketStore.getState().quotes[symbol];
+    if (seed) applyQuote(seed);
+
+    return useMarketStore.subscribe((s, prev) => {
+      const q = s.quotes[symbol];
+      const pq = prev.quotes[symbol];
+      if (!q || q === pq) return;
+      if (pq && q.ts === pq.ts && q.price === pq.price && q.bid === pq.bid && q.ask === pq.ask) return;
+      applyQuote(q);
+    });
+  }, [symbol, resolution, tickSize]);
 
   // Draw / clear the dashed order line while a ticket is open.
   useEffect(() => {

@@ -100,7 +100,10 @@ export const useMarketStore = create<MarketState>((set, get) => ({
     if (isByoMode()) {
       get().watchByo(symbol);
     } else {
-      getWsClient().subscribe("quotes", symbol); // cumulative; ws-client de-dupes
+      const ws = getWsClient();
+      ws.subscribe("quotes", symbol);
+      // Keep every instrument subscribed so charts stay warm when switching.
+      for (const inst of INSTRUMENTS) ws.subscribe("quotes", inst.symbol);
     }
 
     set({ selectedSymbol: symbol, orderbook: null });
