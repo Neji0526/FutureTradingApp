@@ -429,11 +429,14 @@ export function CandleChart({ symbol }: { symbol: string }) {
       barCountRef.current = candleData2.length;
       lastCandleRef.current = candleData2[candleData2.length - 1] ?? null;
       lastVolumeRef.current = volData[volData.length - 1] ?? null;
+      // Keep header bid/ask/last/volume aligned with the series we just painted —
+      // prevents NQ stuck at an old print while candles (if any) moved on.
+      useMarketStore.getState().hydrateQuoteFromCandles(symbol, valid);
       if (opts?.fit) showDefaultView(candleData2.length);
       if (opts?.scroll !== false) chartRef.current?.timeScale().scrollToRealTime();
       return true;
     },
-    [tickSize, resolution, showDefaultView],
+    [tickSize, resolution, showDefaultView, symbol],
   );
 
   // Load history for the current symbol/resolution, re-polling a few times until
@@ -524,22 +527,31 @@ export function CandleChart({ symbol }: { symbol: string }) {
     }
   }, [wsStatus, loadHistory]);
 
-  // Live sync: pull server live-bars every 2s and paint. This is the source of
-  // truth for NQ/MNQ/YM/GC (and ES) so the chart keeps moving even if a WS quote
-  // tick is missed — matches what /api/history already streams correctly.
+  // Live sync: pull server live-bars every 1.5s and paint. Source of truth for
+  // every symbol (ES and NQ/YM/GC alike) so a missed WS tick can't freeze the chart.
+  const [feedEmpty, setFeedEmpty] = useState(false);
   useEffect(() => {
     let cancelled = false;
+    let emptyStreak = 0;
+    setFeedEmpty(false);
     const sync = async () => {
       if (document.visibilityState !== "visible") return;
       const candles = await getWsClient()
         .getHistory(symbol, resolution, HISTORY_COUNT[resolution] ?? DEFAULT_HISTORY_COUNT)
         .catch(() => [] as { time: number; open: number; high: number; low: number; close: number; volume: number }[]);
-      if (cancelled || !candles.length) return;
+      if (cancelled) return;
+      if (!candles.length) {
+        emptyStreak += 1;
+        if (emptyStreak >= 3) setFeedEmpty(true);
+        return;
+      }
+      emptyStreak = 0;
+      setFeedEmpty(false);
       paintCandles(candles, { fit: barCountRef.current < 2, scroll: true });
       setLoading(false);
     };
     void sync();
-    const id = setInterval(() => void sync(), 2_000);
+    const id = setInterval(() => void sync(), 1_500);
     return () => {
       cancelled = true;
       clearInterval(id);
@@ -1330,6 +1342,16 @@ export function CandleChart({ symbol }: { symbol: string }) {
               aria-hidden
             />
             <span className="text-xs font-medium text-muted">Loading chart…</span>
+          </div>
+        )}
+        {!loading && feedEmpty && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-surface-2/80 px-6 text-center backdrop-blur-sm">
+            <div className="text-sm font-semibold text-foreground">No live data for {symbol}</div>
+            <p className="max-w-sm text-xs text-muted">
+              {symbol === "CL" || symbol === "MCL"
+                ? "Crude oil needs NYMEX on the dxFeed account. ES/NQ/YM/GC are entitled; CL/MCL are not."
+                : "Waiting for market data. Confirm the backend shows Live and refresh the page."}
+            </p>
           </div>
         )}
 

@@ -151,15 +151,16 @@ class WSClient {
     if (USE_MOCK_FEED || this.mock) {
       return getMockFeed().getHistory(symbol, resolutionSec, count);
     }
-    // Real backend: fetch via REST history endpoint. Send the auth token — Model B
-    // (byo) serves history from the user's OWN key and requires it (shared mode
-    // ignores it).
     const base = WS_URL.replace(/^ws/, "http").replace(/\/ws.*$/, "");
     const token = getAuthToken();
-    const res = await fetch(
-      `${base}/api/history?symbol=${encodeURIComponent(symbol)}&resolution=${resolutionSec}&count=${count}`,
-      token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
-    );
+    // Cache-bust so Chrome can't serve a stale empty/old candle array for NQ while ES looks live.
+    const url =
+      `${base}/api/history?symbol=${encodeURIComponent(symbol)}` +
+      `&resolution=${resolutionSec}&count=${count}&_=${Date.now()}`;
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
     if (!res.ok) throw new Error(`history ${res.status}`);
     return (await res.json()) as Candle[];
   }
