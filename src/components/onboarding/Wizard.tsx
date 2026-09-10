@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { JourneySidebar } from "./JourneySidebar";
 import { Section } from "./Section";
-import { TextField, SelectField, FileField, CheckboxField } from "./fields";
-import { AGE_RANGES, COUNTRIES, ID_DOCUMENT_TYPES, ADDRESS_PROOF_TYPES, STEPS } from "./data";
+import { SelectField, FileField, CheckboxField } from "./fields";
+import { ID_DOCUMENT_TYPES, ADDRESS_PROOF_TYPES, STEPS } from "./data";
 import { IconCheck, IconLock } from "./icons";
+import { AccountFields } from "./AccountFields";
 import { LegalDocumentModal } from "./LegalDocumentModal";
 import { TERMS_AND_PRIVACY } from "./legal-content";
 import { USE_MOCK_FEED } from "@/lib/constants";
@@ -48,7 +49,10 @@ const EMPTY: Form = {
 const HEADINGS = [
   { title: "Create your account", sub: "Set up your profile and trading preferences in minutes." },
   { title: "Verify your identity", sub: "Complete KYC so we can activate your account securely." },
-  { title: "Fund & start trading", sub: "Confirm your purchase and receive your account credentials." },
+  {
+    title: "Fund & start trading",
+    sub: "Pay your membership fee and receive your account credentials.",
+  },
 ];
 
 /**
@@ -75,35 +79,39 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     setErrors((e) => (e[k] ? { ...e, [k]: "" } : e));
   };
 
+  const accountComplete = Boolean(
+    form.firstName.trim().length >= 2 &&
+      form.lastName.trim().length >= 2 &&
+      EMAIL_RE.test(form.email) &&
+      form.password.length >= 8 &&
+      form.password === form.confirm &&
+      form.ageRange &&
+      form.country,
+  );
+
   /** Which sections of the current step are filled in — drives the tick badges. */
   const complete: Record<string, boolean> = {
-    account: Boolean(
-      form.firstName &&
-        form.lastName &&
-        EMAIL_RE.test(form.email) &&
-        form.password.length >= 8 &&
-        form.password === form.confirm &&
-        form.ageRange &&
-        form.country,
-    ),
     documents: form.acceptTerms && form.acceptRisk,
-    identity: Boolean(form.idType && form.idFile),
-    address: Boolean(form.addressType && form.addressFile),
+    identity: Boolean(form.idType && form.idFile && form.addressType && form.addressFile),
+    address: accountComplete,
     payment: true,
-    launch: launchReviewed,
+    launch: accountComplete && launchReviewed,
   };
+
+  function validateAccountFields(e: Errors) {
+    if (form.firstName.trim().length < 2) e.firstName = "Enter your first name.";
+    if (form.lastName.trim().length < 2) e.lastName = "Enter your last name.";
+    if (!EMAIL_RE.test(form.email.trim())) e.email = "Enter a valid email address.";
+    if (form.password.length < 8) e.password = "Use at least 8 characters.";
+    if (form.password !== form.confirm) e.confirm = "Passwords do not match.";
+    if (!form.ageRange) e.ageRange = "Select your age range.";
+    if (!form.country) e.country = "Select your country.";
+  }
 
   function validate(): boolean {
     const e: Errors = {};
 
     if (step === 0) {
-      if (form.firstName.trim().length < 2) e.firstName = "Enter your first name.";
-      if (form.lastName.trim().length < 2) e.lastName = "Enter your last name.";
-      if (!EMAIL_RE.test(form.email.trim())) e.email = "Enter a valid email address.";
-      if (form.password.length < 8) e.password = "Use at least 8 characters.";
-      if (form.password !== form.confirm) e.confirm = "Passwords do not match.";
-      if (!form.ageRange) e.ageRange = "Select your age range.";
-      if (!form.country) e.country = "Select your country.";
       if (!form.acceptTerms) e.acceptTerms = "You must accept the terms to continue.";
       if (!form.acceptRisk) e.acceptRisk = "You must acknowledge the risk disclosure.";
     }
@@ -113,6 +121,12 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       if (!form.idFile) e.idFile = "Upload your identity document.";
       if (!form.addressType) e.addressType = "Choose a document type.";
       if (!form.addressFile) e.addressFile = "Upload your proof of address.";
+      validateAccountFields(e);
+    }
+
+    if (step === 2) {
+      validateAccountFields(e);
+      if (!launchReviewed) e.launch = "Open Launch Platform and confirm your details.";
     }
 
     setErrors(e);
@@ -120,9 +134,23 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     // Reveal the first section that has an error, so the message is on screen.
     if (Object.keys(e).length) {
       const inSecond =
-        (step === 0 && (e.acceptTerms || e.acceptRisk) && !e.firstName && !e.lastName && !e.email) ||
-        (step === 1 && (e.addressType || e.addressFile) && !e.idType && !e.idFile);
-      setOpen(inSecond ? 2 : 1);
+        step === 1 &&
+        (e.firstName ||
+          e.lastName ||
+          e.email ||
+          e.password ||
+          e.confirm ||
+          e.ageRange ||
+          e.country) &&
+        !e.idType &&
+        !e.idFile &&
+        !e.addressType &&
+        !e.addressFile;
+      if (step === 2 && (e.firstName || e.lastName || e.email || e.password || e.launch)) {
+        setOpen(2);
+      } else {
+        setOpen(inSecond ? 2 : 1);
+      }
       return false;
     }
     return true;
@@ -197,7 +225,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     setOpen((o) => (o === n ? 0 : n));
   };
 
-  const canSubmitFinal = step !== STEPS.length - 1 || launchReviewed;
+  const canSubmitFinal = step !== STEPS.length - 1 || complete.launch;
 
   if (done) {
     return (
@@ -251,164 +279,72 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
 
         <div className="mt-7 space-y-4">
           {step === 0 && (
-            <>
-              <Section
-                index={1}
-                title="Account information"
-                complete={complete.account}
-                open={open === 1}
-                onToggle={() => toggle(1)}
-              >
-                <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
-                  <TextField
-                    label="First name"
-                    required
-                    autoComplete="given-name"
-                    placeholder="Enter your first name"
-                    value={form.firstName}
-                    error={errors.firstName}
-                    onChange={(e) => set("firstName", e.target.value)}
-                  />
-                  <TextField
-                    label="Last name"
-                    required
-                    autoComplete="family-name"
-                    placeholder="Enter your last name"
-                    value={form.lastName}
-                    error={errors.lastName}
-                    onChange={(e) => set("lastName", e.target.value)}
-                  />
-                  <TextField
-                    className="sm:col-span-2"
-                    label="Email address"
-                    required
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    hint="Must match the email used for the purchase."
-                    value={form.email}
-                    error={errors.email}
-                    onChange={(e) => set("email", e.target.value)}
-                  />
-                  <TextField
-                    label="Password"
-                    required
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="Create a password"
-                    value={form.password}
-                    error={errors.password}
-                    onChange={(e) => set("password", e.target.value)}
-                  />
-                  <TextField
-                    label="Confirm password"
-                    required
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder="Confirm your password"
-                    value={form.confirm}
-                    error={errors.confirm}
-                    onChange={(e) => set("confirm", e.target.value)}
-                  />
-                  <SelectField
-                    label="Age"
-                    required
-                    value={form.ageRange}
-                    error={errors.ageRange}
-                    onChange={(e) => set("ageRange", e.target.value)}
-                  >
-                    <option value="">Select your age range</option>
-                    {AGE_RANGES.map((a) => (
-                      <option key={a} value={a}>
-                        {a}
-                      </option>
-                    ))}
-                  </SelectField>
-                  <SelectField
-                    className="sm:col-span-2"
-                    label="Country of residence"
-                    required
-                    value={form.country}
-                    error={errors.country}
-                    onChange={(e) => set("country", e.target.value)}
-                  >
-                    <option value="">Select your country</option>
-                    {COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </SelectField>
-                </div>
-              </Section>
-
-              <Section
-                index={2}
-                title="Documents"
-                complete={complete.documents}
-                open={open === 2}
-                onToggle={() => toggle(2)}
-              >
-                <div className="space-y-5">
-                  <CheckboxField
-                    checked={form.acceptTerms}
-                    error={errors.acceptTerms}
-                    onChange={(v) => {
-                      if (!v) {
-                        set("acceptTerms", false);
-                        return;
-                      }
-                      // Must read and accept the combined legal document first.
-                      if (!form.acceptTerms) {
-                        setLegalOpen(true);
-                        return;
-                      }
-                      set("acceptTerms", true);
-                    }}
-                    label={
-                      <>
-                        I have read and accept the{" "}
-                        <button
-                          type="button"
-                          className="font-semibold text-[var(--l-ink)] underline decoration-[var(--l-line)] underline-offset-2 hover:decoration-[var(--l-ink)]"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setLegalOpen(true);
-                          }}
-                        >
-                          Terms of Service
-                        </button>{" "}
-                        and{" "}
-                        <button
-                          type="button"
-                          className="font-semibold text-[var(--l-ink)] underline decoration-[var(--l-line)] underline-offset-2 hover:decoration-[var(--l-ink)]"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setLegalOpen(true);
-                          }}
-                        >
-                          Privacy Policy
-                        </button>
-                        .
-                      </>
+            <Section
+              index={1}
+              title="Documents"
+              complete={complete.documents}
+              open={open === 1}
+              onToggle={() => toggle(1)}
+            >
+              <div className="space-y-5">
+                <CheckboxField
+                  checked={form.acceptTerms}
+                  error={errors.acceptTerms}
+                  onChange={(v) => {
+                    if (!v) {
+                      set("acceptTerms", false);
+                      return;
                     }
-                  />
-                  <CheckboxField
-                    checked={form.acceptRisk}
-                    error={errors.acceptRisk}
-                    onChange={(v) => set("acceptRisk", v)}
-                    label={
-                      <>
-                        I understand that evaluation accounts are simulated and that futures trading
-                        carries substantial risk of loss.
-                      </>
+                    // Must read and accept the combined legal document first.
+                    if (!form.acceptTerms) {
+                      setLegalOpen(true);
+                      return;
                     }
-                  />
-                </div>
-              </Section>
-            </>
+                    set("acceptTerms", true);
+                  }}
+                  label={
+                    <>
+                      I have read and accept the{" "}
+                      <button
+                        type="button"
+                        className="font-semibold text-[var(--l-ink)] underline decoration-[var(--l-line)] underline-offset-2 hover:decoration-[var(--l-ink)]"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setLegalOpen(true);
+                        }}
+                      >
+                        Terms of Service
+                      </button>{" "}
+                      and{" "}
+                      <button
+                        type="button"
+                        className="font-semibold text-[var(--l-ink)] underline decoration-[var(--l-line)] underline-offset-2 hover:decoration-[var(--l-ink)]"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setLegalOpen(true);
+                        }}
+                      >
+                        Privacy Policy
+                      </button>
+                      .
+                    </>
+                  }
+                />
+                <CheckboxField
+                  checked={form.acceptRisk}
+                  error={errors.acceptRisk}
+                  onChange={(v) => set("acceptRisk", v)}
+                  label={
+                    <>
+                      I understand that evaluation accounts are simulated and that futures trading
+                      carries substantial risk of loss.
+                    </>
+                  }
+                />
+              </div>
+            </Section>
           )}
 
           {step === 1 && (
@@ -422,7 +358,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
               >
                 <div className="space-y-5">
                   <SelectField
-                    label="Document type"
+                    label="Identity document type"
                     required
                     value={form.idType}
                     error={errors.idType}
@@ -436,7 +372,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                     ))}
                   </SelectField>
                   <FileField
-                    label="Upload document"
+                    label="Upload identity document"
                     required
                     file={form.idFile}
                     error={errors.idFile}
@@ -446,19 +382,8 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                     }}
                     hint="Photo page, in colour, all four corners visible."
                   />
-                </div>
-              </Section>
-
-              <Section
-                index={2}
-                title="Proof of Address"
-                complete={complete.address}
-                open={open === 2}
-                onToggle={() => toggle(2)}
-              >
-                <div className="space-y-5">
                   <SelectField
-                    label="Document type"
+                    label="Proof of address type"
                     required
                     value={form.addressType}
                     error={errors.addressType}
@@ -472,7 +397,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                     ))}
                   </SelectField>
                   <FileField
-                    label="Upload document"
+                    label="Upload proof of address"
                     required
                     file={form.addressFile}
                     error={errors.addressFile}
@@ -483,6 +408,21 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                     hint="Issued within the last 3 months and showing your full address."
                   />
                 </div>
+              </Section>
+
+              <Section
+                index={2}
+                title="Proof of Address"
+                complete={complete.address}
+                open={open === 2}
+                onToggle={() => toggle(2)}
+              >
+                <AccountFields
+                  form={form}
+                  errors={errors}
+                  onChange={set}
+                  ageFullWidth
+                />
               </Section>
             </>
           )}
@@ -526,12 +466,12 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                 open={open === 2}
                 onToggle={() => toggle(2)}
               >
-                <p className="text-[13.5px] leading-relaxed text-[var(--l-body)]">
-                  Completing registration redeems order{" "}
-                  <span className="nums font-semibold text-[var(--l-ink)]">{orderNumber}</span>, creates
-                  your trading account, and burns this purchase so it cannot be reused. Use the same email
-                  you used at checkout.
-                </p>
+                <AccountFields
+                  form={form}
+                  errors={errors}
+                  onChange={set}
+                  showEmailHint
+                />
               </Section>
             </>
           )}
