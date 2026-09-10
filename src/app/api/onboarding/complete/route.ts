@@ -60,9 +60,17 @@ export async function POST(req: Request) {
   }
 
   try {
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip")?.trim() ||
+      "";
     const upstream = await fetch(`${backend}/api/onboarding/complete`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(clientIp ? { "x-forwarded-for": clientIp, "x-real-ip": clientIp } : {}),
+      },
       body: JSON.stringify({
         orderNumber,
         email,

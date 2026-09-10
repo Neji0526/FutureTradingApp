@@ -91,6 +91,7 @@ export default function TraderDetailPage() {
   const id = String(params.id);
   const getTraderDetail = useAdminStore((s) => s.getTraderDetail);
   const setTraderStatus = useAdminStore((s) => s.setTraderStatus);
+  const deactivateSubscription = useAdminStore((s) => s.deactivateSubscription);
   const resetAccount = useAdminStore((s) => s.resetAccount);
   const assignTier = useAdminStore((s) => s.assignTier);
   const getRuleTemplates = useAdminStore((s) => s.getRuleTemplates);
@@ -198,6 +199,28 @@ export default function TraderDetailPage() {
     setBusy(false);
   }
 
+  async function onDeactivateSubscription() {
+    if (!detail) return;
+    if (
+      !window.confirm(
+        `Deactivate subscription for ${detail.trader.name}? This removes their purchase data and permanently blocks login until they buy again.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setActionMsg(null);
+    const r = await deactivateSubscription(detail.trader.id);
+    const d = await getTraderDetail(id);
+    setDetail(d);
+    setBusy(false);
+    setActionMsg({
+      ok: r.ok,
+      text: r.ok ? "✓ Subscription deactivated — purchase removed, login blocked" : `✗ ${r.error ?? "Deactivate failed"}`,
+    });
+    setTimeout(() => setActionMsg(null), 4000);
+  }
+
   async function runAction(key: string, fn: () => Promise<AdminActionResult>, confirmMsg?: string) {
     if (!detail?.account) return;
     if (confirmMsg && !window.confirm(confirmMsg)) return;
@@ -246,15 +269,20 @@ export default function TraderDetailPage() {
           </span>
         }
         actions={
-          trader.status === "active" ? (
-            <Button variant="danger" size="sm" loading={busy} onClick={toggleStatus}>
-              Suspend trader
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="danger" size="sm" loading={busy} onClick={onDeactivateSubscription}>
+              Deactivate subscription
             </Button>
-          ) : (
-            <Button variant="secondary" size="sm" loading={busy} onClick={toggleStatus}>
-              Activate trader
-            </Button>
-          )
+            {trader.status === "active" ? (
+              <Button variant="secondary" size="sm" loading={busy} onClick={toggleStatus}>
+                Suspend trader
+              </Button>
+            ) : (
+              <Button variant="secondary" size="sm" loading={busy} onClick={toggleStatus}>
+                Activate trader
+              </Button>
+            )}
+          </div>
         }
       />
 

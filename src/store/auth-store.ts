@@ -74,8 +74,10 @@ export const useAuthStore = create<AuthState>()(
               set({ user, token: data.token });
               return { ok: true, role: user.role };
             }
+            const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+            if (res.status === 403 && data.error) return { ok: false, error: data.error };
             if (res.status === 401) return { ok: false, error: "Invalid email or password." };
-            return { ok: false, error: "Login failed. Please try again." };
+            return { ok: false, error: data.error ?? "Login failed. Please try again." };
           } catch {
             // A backend IS configured but is unreachable. Do NOT silently fall
             // through to demo users — that would masquerade as a working login
@@ -144,8 +146,16 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
+        const token = get().token;
         deleteCookie(SESSION_COOKIE);
         set({ user: null, token: null });
+        // Release the server-side session lock so the account can sign in again.
+        if (!USE_MOCK_FEED && API_BASE && token) {
+          void fetch(`${API_BASE}/api/auth/logout`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => {});
+        }
       },
 
       setHydrated: () => set({ hydrated: true }),

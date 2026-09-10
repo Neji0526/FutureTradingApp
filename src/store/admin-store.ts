@@ -50,6 +50,8 @@ interface AdminState {
   /** Re-fetch all admin datasets from the backend. */
   refresh: () => Promise<void>;
   setTraderStatus: (id: string, status: TraderStatus) => Promise<void>;
+  /** Cancel subscription: remove purchase data and block login. */
+  deactivateSubscription: (id: string) => Promise<AdminActionResult>;
   setAccountStatus: (id: string, status: TraderStatus) => Promise<void>;
   updateRule: (accountId: string, patch: RulePatch) => Promise<void>;
   /** Fetch all 9 global rule templates (cached in state after first load). */
@@ -183,6 +185,29 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       traders: s.traders.map((t) => (t.id === id ? { ...t, status } : t)),
       accounts: s.accounts.map((a) => (a.traderId === id ? { ...a, status } : a)),
     }));
+  },
+
+  deactivateSubscription: async (id) => {
+    const token = live();
+    if (token) {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/traders/${id}/deactivate-subscription`, {
+          method: "POST",
+          headers: authHeaders(token),
+        });
+        const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; purchasesRemoved?: number };
+        await get().refresh().catch(() => {});
+        if (!res.ok || !data.ok) return { ok: false, error: data.error ?? "Deactivate failed" };
+        return { ok: true };
+      } catch {
+        return { ok: false, error: "Could not reach the server." };
+      }
+    }
+    set((s) => ({
+      traders: s.traders.map((t) => (t.id === id ? { ...t, status: "suspended" as TraderStatus } : t)),
+      accounts: s.accounts.map((a) => (a.traderId === id ? { ...a, status: "suspended" as TraderStatus } : a)),
+    }));
+    return { ok: true };
   },
 
   setAccountStatus: async (id, status) => {
