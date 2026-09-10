@@ -37,7 +37,7 @@ const RESOLUTIONS = [
 // initial fit. Below this we keep the spinner up and re-fit each frame, so the
 // sparse "live bars only" first response from the backend isn't shown as a lonely
 // 1–2 candle sliver while the full history backfills.
-const REVEAL_MIN_BARS = 30;
+const REVEAL_MIN_BARS = 5;
 
 // How many bars of history to request per resolution. 1m is sized to ~7 trading
 // days (CME trades ~23h/day ≈ 1,380 one-minute bars/day); coarser frames cover
