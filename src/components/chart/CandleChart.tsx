@@ -453,10 +453,18 @@ export function CandleChart({ symbol }: { symbol: string }) {
       const target = HISTORY_COUNT[resolution] ?? DEFAULT_HISTORY_COUNT;
       if (showSpinner) setLoading(true);
       setTicket(null);
-
+      // Drop any previous symbol's 1-bar flat series so MNQ can't stay stuck on an
+      // old print while waiting for history (looked like a dead chart).
       if (showSpinner) {
-        // Do NOT clear existing series here — clearing caused a blank/flat chart
-        // whenever history was briefly empty. New data replaces via setData.
+        barCountRef.current = 0;
+        lastCandleRef.current = null;
+        lastVolumeRef.current = null;
+        try {
+          candleRef.current?.setData([]);
+          volumeRef.current?.setData([]);
+        } catch {
+          /* chart may not be ready yet */
+        }
         candleRef.current?.applyOptions({
           priceFormat: { type: "price", precision, minMove: tickSize },
         });
@@ -472,8 +480,10 @@ export function CandleChart({ symbol }: { symbol: string }) {
         if (candles.length && candles.length >= bestCount) {
           noGrowth = candles.length > bestCount ? 0 : noGrowth + 1;
           bestCount = candles.length;
-          const ok = paintCandles(candles, { fit: showSpinner && !fitted, scroll: true });
-          if (ok && showSpinner) fitted = true;
+          // Always fit once we have a real multi-bar series (MES-like candles).
+          const shouldFit = showSpinner && (!fitted || candles.length >= 5);
+          const ok = paintCandles(candles, { fit: shouldFit, scroll: true });
+          if (ok && candles.length >= 2) fitted = true;
         } else {
           noGrowth += 1;
         }
@@ -547,7 +557,9 @@ export function CandleChart({ symbol }: { symbol: string }) {
       }
       emptyStreak = 0;
       setFeedEmpty(false);
-      paintCandles(candles, { fit: barCountRef.current < 2, scroll: true });
+      // Fit whenever we climb out of a 0–1 bar dead state into a real series.
+      const needFit = barCountRef.current < 5 && candles.length >= 5;
+      paintCandles(candles, { fit: needFit || barCountRef.current < 2, scroll: true });
       setLoading(false);
     };
     void sync();

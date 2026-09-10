@@ -100,9 +100,46 @@ export const useMarketStore = create<MarketState>((set, get) => ({
       // Ignore older WS frames so a stale reconnect snapshot can't freeze NQ at an
       // old print while live bars have already moved on.
       if (prev && prev.ts > q.ts && Date.now() - prev.ts < 15_000) return s;
+
+      let next = q;
+      // Thin Quote ticks often arrive with volume=0 and high=low=price. Never let
+      // those wipe richer stats already hydrated from the candle series (MES-like
+      // headers). Keep live price/bid/ask, preserve volume/range from history.
+      if (prev && (prev.volume24h ?? 0) > 0 && (q.volume24h ?? 0) === 0) {
+        next = {
+          ...q,
+          volume24h: prev.volume24h,
+          high24h: Math.max(prev.high24h, q.high24h, q.price),
+          low24h:
+            prev.low24h > 0
+              ? Math.min(prev.low24h, q.low24h > 0 ? q.low24h : q.price, q.price)
+              : q.low24h,
+          change24h: prev.change24h !== 0 ? prev.change24h : q.change24h,
+        };
+      }
+      // Reject a clearly stale flat print when we already have a better hydrated price
+      // (the 29508-vs-29200 dead-chart bug).
+      if (
+        prev &&
+        (prev.volume24h ?? 0) > 0 &&
+        (q.volume24h ?? 0) === 0 &&
+        q.high24h === q.low24h &&
+        Math.abs(prev.price - q.price) / Math.max(q.price, 1) > 0.002
+      ) {
+        next = {
+          ...prev,
+          price: q.price,
+          bid: q.bid,
+          ask: q.ask,
+          ts: q.ts,
+          high24h: Math.max(prev.high24h, q.price),
+          low24h: prev.low24h > 0 ? Math.min(prev.low24h, q.price) : q.price,
+        };
+      }
+
       return {
-        prevPrice: { ...s.prevPrice, [q.symbol]: prev?.price ?? q.price },
-        quotes: { ...s.quotes, [q.symbol]: q },
+        prevPrice: { ...s.prevPrice, [q.symbol]: prev?.price ?? next.price },
+        quotes: { ...s.quotes, [q.symbol]: next },
       };
     });
   },
@@ -165,7 +202,7 @@ export const useMarketStore = create<MarketState>((set, get) => ({
       const pollLiveMarks = async () => {
         if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
         const selected = get().selectedSymbol;
-        const warm = new Set([selected, "ES", "NQ", "YM", "GC", "CL"]);
+        const warm = new Set([selected, "ES", "MES", "NQ", "MNQ", "YM", "MYM", "GC", "MGC", "CL", "MCL"]);
         await Promise.all(
           [...warm].map(async (sym) => {
             try {
