@@ -225,6 +225,7 @@ export function CandleChart({ symbol }: { symbol: string }) {
   const setPositionBracket = useOrdersStore((s) => s.setPositionBracket);
   const allOrders = useOrdersStore((s) => s.orders);
   const allPositions = useOrdersStore((s) => s.positions);
+  const quote = useMarketStore((s) => s.quotes[symbol]);
   const theme = useThemeStore((s) => s.theme);
 
   // Resting (working) limit/stop orders for this symbol — drawn on the chart as
