@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useOrdersStore } from "@/store/orders-store";
 import { useMarketStore } from "@/store/market-store";
+import { useFeedStatusStore } from "@/store/feed-status-store";
 import { useAccountStore } from "@/store/account-store";
 import { getInstrument } from "@/lib/constants";
 import type { OrderType, Side, TimeInForce } from "@/lib/types";
@@ -17,7 +18,10 @@ export function OrderTicket({ symbol }: { symbol: string }) {
   const placeOrder = useOrdersStore((s) => s.placeOrder);
   const quote = useMarketStore((s) => s.quotes[symbol]);
   const selectSymbol = useMarketStore((s) => s.selectSymbol);
+  const feedRow = useFeedStatusStore((s) => s.bySymbol[symbol]);
   const rule = useAccountStore((s) => s.summary?.rule);
+  const feedBlocked = !!(feedRow && (feedRow.state === "blocked" || !feedRow.entitled));
+  const canTrade = !!quote && quote.price > 0 && !feedBlocked;
   const inst = getInstrument(symbol);
   const precision = inst?.pricePrecision ?? 2;
 
@@ -118,12 +122,28 @@ export function OrderTicket({ symbol }: { symbol: string }) {
 
   async function submitOrder(orderSide: Side) {
     setPendingSuggestion(null);
+    if (feedBlocked) {
+      showFeedback(false, feedRow?.reason ?? `${symbol} is not entitled on this gateway.`);
+      return;
+    }
+    if (type === "market" && (!quote || !(quote.price > 0))) {
+      showFeedback(false, "No live quote yet — wait for the feed.");
+      return;
+    }
     await sendOrder(orderSide);
   }
 
   async function quickOrder(orderSide: Side, mode: "mkt" | "ask" | "bid") {
     if (submitting) return;
     if (qtyNum <= 0) { showFeedback(false, "Enter a quantity first."); return; }
+    if (feedBlocked) {
+      showFeedback(false, feedRow?.reason ?? `${symbol} is not entitled on this gateway.`);
+      return;
+    }
+    if (!quote || !(quote.price > 0)) {
+      showFeedback(false, "No live quote yet — wait for the feed.");
+      return;
+    }
     const orderType: OrderType = mode === "mkt" ? "market" : "limit";
     const limitPrice = mode === "ask" ? quote?.ask : mode === "bid" ? quote?.bid : null;
     if (orderType === "limit" && !(typeof limitPrice === "number" && limitPrice > 0)) {
@@ -266,13 +286,21 @@ export function OrderTicket({ symbol }: { symbol: string }) {
       <div>
         <Label>Quick trade</Label>
         <div className="grid grid-cols-2 gap-1.5">
-          <QuickBtn tone="long"  solid disabled={qtyNum <= 0 || submitting} onClick={() => quickOrder("buy",  "mkt")}>Buy MKT</QuickBtn>
-          <QuickBtn tone="short" solid disabled={qtyNum <= 0 || submitting} onClick={() => quickOrder("sell", "mkt")}>Sell MKT</QuickBtn>
-          <QuickBtn tone="long"       disabled={qtyNum <= 0 || submitting || !quote} onClick={() => quickOrder("buy",  "ask")}>Buy Ask</QuickBtn>
-          <QuickBtn tone="short"      disabled={qtyNum <= 0 || submitting || !quote} onClick={() => quickOrder("sell", "ask")}>Sell Ask</QuickBtn>
-          <QuickBtn tone="long"       disabled={qtyNum <= 0 || submitting || !quote} onClick={() => quickOrder("buy",  "bid")}>Buy Bid</QuickBtn>
-          <QuickBtn tone="short"      disabled={qtyNum <= 0 || submitting || !quote} onClick={() => quickOrder("sell", "bid")}>Sell Bid</QuickBtn>
+          <QuickBtn tone="long"  solid disabled={qtyNum <= 0 || submitting || !canTrade} onClick={() => quickOrder("buy",  "mkt")}>Buy MKT</QuickBtn>
+          <QuickBtn tone="short" solid disabled={qtyNum <= 0 || submitting || !canTrade} onClick={() => quickOrder("sell", "mkt")}>Sell MKT</QuickBtn>
+          <QuickBtn tone="long"       disabled={qtyNum <= 0 || submitting || !canTrade} onClick={() => quickOrder("buy",  "ask")}>Buy Ask</QuickBtn>
+          <QuickBtn tone="short"      disabled={qtyNum <= 0 || submitting || !canTrade} onClick={() => quickOrder("sell", "ask")}>Sell Ask</QuickBtn>
+          <QuickBtn tone="long"       disabled={qtyNum <= 0 || submitting || !canTrade} onClick={() => quickOrder("buy",  "bid")}>Buy Bid</QuickBtn>
+          <QuickBtn tone="short"      disabled={qtyNum <= 0 || submitting || !canTrade} onClick={() => quickOrder("sell", "bid")}>Sell Bid</QuickBtn>
         </div>
+        {feedBlocked && (
+          <p className="mt-1.5 text-[11px] text-short">
+            {feedRow?.reason ?? "This symbol needs a gateway exchange entitlement."}
+          </p>
+        )}
+        {!feedBlocked && !quote && (
+          <p className="mt-1.5 text-[11px] text-muted">Waiting for a live quote before trading.</p>
+        )}
       </div>
 
       {/* Max-risk-per-trade suggestion — pinned to the TOP of the page as a fixed banner
@@ -327,7 +355,7 @@ export function OrderTicket({ symbol }: { symbol: string }) {
           variant="long"
           size="lg"
           loading={submitting}
-          disabled={qtyNum <= 0}
+          disabled={qtyNum <= 0 || !canTrade || (type === "market" && !canTrade)}
           onClick={() => submitOrder("buy")}
         >
           Buy {symbol}
@@ -337,7 +365,7 @@ export function OrderTicket({ symbol }: { symbol: string }) {
           variant="short"
           size="lg"
           loading={submitting}
-          disabled={qtyNum <= 0}
+          disabled={qtyNum <= 0 || !canTrade || (type === "market" && !canTrade)}
           onClick={() => submitOrder("sell")}
         >
           Sell {symbol}

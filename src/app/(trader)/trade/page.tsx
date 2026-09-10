@@ -10,25 +10,30 @@ import { OrderTicket } from "@/components/trade/OrderTicket";
 import { PositionsTable } from "@/components/trade/PositionsTable";
 import { OrdersTable } from "@/components/trade/OrdersTable";
 import { AccountStatusBanner } from "@/components/trade/AccountStatusBanner";
+import { FeedStatusBanner } from "@/components/trade/FeedStatusBanner";
 import { AdvancedChart } from "@/components/chart/tradingview/AdvancedChart";
 import { LivePrice } from "@/components/market/LivePrice";
 import { SymbolPicker } from "@/components/market/SymbolPicker";
 import { formatPrice, formatPercent, formatCompact, cn } from "@/lib/utils";
+import { useFeedStatusStore } from "@/store/feed-status-store";
 
 export default function TradePage() {
   const symbol = useMarketStore((s) => s.selectedSymbol);
   const quote = useMarketStore((s) => s.quotes[symbol]);
   const contractCode = useMarketStore((s) => s.contractCodes[symbol]);
+  const feedRow = useFeedStatusStore((s) => s.bySymbol[symbol]);
   const orders = useOrdersStore((s) => s.orders);
   const inst = getInstrument(symbol);
   const precision = inst?.pricePrecision ?? 2;
   const [bottomTab, setBottomTab] = useState<"positions" | "orders">("positions");
 
   const openOrders = orders.filter((o) => o.status === "open" || o.status === "partial");
+  const feedBlocked = feedRow && (feedRow.state === "blocked" || !feedRow.entitled);
 
   return (
     <div className="flex flex-col gap-3">
       <AccountStatusBanner />
+      <FeedStatusBanner />
       <div className="grid gap-3 lg:grid-cols-[1fr_300px] lg:items-start">
       {/* Center: instrument header + chart + bottom tabs */}
       <div className="flex flex-col gap-3">
@@ -39,6 +44,9 @@ export default function TradePage() {
               <div className="flex items-center gap-2">
                 <span className="nums text-lg font-semibold">{contractCode ?? symbol}</span>
                 <Badge tone="neutral">{inst?.category}</Badge>
+                {feedBlocked && <Badge tone="short">Not entitled</Badge>}
+                {feedRow?.state === "stale" && <Badge tone="warning">Stale</Badge>}
+                {feedRow?.state === "live" && <Badge tone="long">Live</Badge>}
               </div>
               <div className="text-xs text-muted-2">{inst?.name}</div>
             </div>

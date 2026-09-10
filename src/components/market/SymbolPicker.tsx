@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMarketStore } from "@/store/market-store";
+import { useFeedStatusStore } from "@/store/feed-status-store";
 import { INSTRUMENTS } from "@/lib/constants";
 import type { InstrumentCategory } from "@/lib/types";
 import { Icon } from "@/components/icons";
@@ -18,10 +19,16 @@ export function SymbolPicker() {
   const selected = useMarketStore((s) => s.selectedSymbol);
   const codes = useMarketStore((s) => s.contractCodes);
   const select = useMarketStore((s) => s.selectSymbol);
+  const feedBySymbol = useFeedStatusStore((s) => s.bySymbol);
+  const startFeed = useFeedStatusStore((s) => s.start);
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    startFeed();
+  }, [startFeed]);
 
   useEffect(() => {
     if (!open) return;
@@ -107,6 +114,19 @@ export function SymbolPicker() {
                   {g.items.map((i) => {
                     const code = codes[i.symbol] ?? i.symbol;
                     const active = i.symbol === selected;
+                    const feed = feedBySymbol[i.symbol];
+                    const blocked = feed && (feed.state === "blocked" || !feed.entitled);
+                    const statusLabel = blocked
+                      ? feed.exchange
+                        ? `Needs ${feed.exchange}`
+                        : "Blocked"
+                      : feed?.state === "live"
+                        ? "Live"
+                        : feed?.state === "stale"
+                          ? "Stale"
+                          : feed?.state === "missing"
+                            ? "No feed"
+                            : null;
                     return (
                       <button
                         key={i.symbol}
@@ -114,15 +134,32 @@ export function SymbolPicker() {
                         className={cn(
                           "flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors",
                           active ? "bg-primary/10" : "hover:bg-surface-2",
+                          blocked && "opacity-70",
                         )}
                       >
                         <div className="min-w-0">
                           <div className="nums text-sm font-semibold text-foreground">{code}</div>
                           <div className="truncate text-xs text-muted-2">{i.name}</div>
                         </div>
-                        <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-muted">
-                          {i.symbol}
-                        </span>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {statusLabel && (
+                            <span
+                              className={cn(
+                                "rounded px-1.5 py-0.5 text-[10px]",
+                                blocked
+                                  ? "bg-short/15 text-short"
+                                  : feed?.state === "live"
+                                    ? "bg-long/15 text-long"
+                                    : "bg-surface-3 text-muted",
+                              )}
+                            >
+                              {statusLabel}
+                            </span>
+                          )}
+                          <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-muted">
+                            {i.symbol}
+                          </span>
+                        </div>
                       </button>
                     );
                   })}

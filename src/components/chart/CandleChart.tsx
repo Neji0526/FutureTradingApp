@@ -18,6 +18,7 @@ import {
 } from "lightweight-charts";
 import { getWsClient } from "@/lib/ws-client";
 import { useMarketStore } from "@/store/market-store";
+import { useFeedStatusStore } from "@/store/feed-status-store";
 import { useOrdersStore } from "@/store/orders-store";
 import { useThemeStore } from "@/store/theme-store";
 import { getChartColors } from "@/lib/chart-theme";
@@ -227,6 +228,8 @@ export function CandleChart({ symbol }: { symbol: string }) {
   const allPositions = useOrdersStore((s) => s.positions);
   const quote = useMarketStore((s) => s.quotes[symbol]);
   const theme = useThemeStore((s) => s.theme);
+  const feedRow = useFeedStatusStore((s) => s.bySymbol[symbol]);
+  const feedReason = feedRow?.reason ?? null;
 
   // Resting (working) limit/stop orders for this symbol — drawn on the chart as
   // draggable lines. Market orders fill instantly so never appear here.
@@ -1360,9 +1363,10 @@ export function CandleChart({ symbol }: { symbol: string }) {
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-surface-2/80 px-6 text-center backdrop-blur-sm">
             <div className="text-sm font-semibold text-foreground">No live data for {symbol}</div>
             <p className="max-w-sm text-xs text-muted">
-              {symbol === "CL" || symbol === "MCL"
-                ? "Crude oil needs NYMEX on the dxFeed account. ES/NQ/YM/GC are entitled; CL/MCL are not."
-                : "Waiting for market data. Confirm the backend shows Live and refresh the page."}
+              {feedReason ??
+                (symbol === "CL" || symbol === "MCL"
+                  ? "Crude oil needs NYMEX on the dxFeed account."
+                  : "Waiting for market data. Confirm the backend shows Live and refresh the page.")}
             </p>
           </div>
         )}
