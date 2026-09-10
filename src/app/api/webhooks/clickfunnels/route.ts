@@ -85,6 +85,24 @@ export async function POST(req: Request) {
   // 2) Notify Make.com (non-fatal if Make is down — purchase is already saved).
   let makeOk = false;
   if (MAKE_WEBHOOK_URL) {
+    const recordedPurchase = asRecord(asRecord(recorded)?.purchase);
+    const orderNumber =
+      str(recordedPurchase?.orderNumber) ||
+      str(asRecord(payload)?.order_number) ||
+      str(asRecord(payload)?.orderNumber) ||
+      str(asRecord(asRecord(payload)?.order)?.order_number) ||
+      str(asRecord(asRecord(payload)?.contact)?.id) ||
+      str(asRecord(payload)?.id);
+    const email =
+      str(recordedPurchase?.email) ||
+      str(asRecord(payload)?.email) ||
+      str(asRecord(asRecord(payload)?.contact)?.email);
+    const contact = asRecord(asRecord(payload)?.contact) ?? {};
+    const contactName =
+      str(contact.name) ||
+      [str(contact.first_name), str(contact.last_name)].filter(Boolean).join(" ") ||
+      str(asRecord(payload)?.name);
+
     try {
       const upstream = await fetch(MAKE_WEBHOOK_URL, {
         method: "POST",
@@ -92,6 +110,22 @@ export async function POST(req: Request) {
         body: JSON.stringify({
           source: "clickfunnels",
           receivedAt: new Date().toISOString(),
+          // Top-level fields Make can map without digging into nested CF shapes.
+          orderNumber,
+          order_number: orderNumber,
+          email,
+          Email: email,
+          name: contactName,
+          Name: contactName,
+          status: str(asRecord(payload)?.status) || "paid",
+          contact: {
+            ...contact,
+            name: str(contact.name) || contactName,
+            first_name: str(contact.first_name) || str(asRecord(payload)?.first_name),
+            last_name: str(contact.last_name) || str(asRecord(payload)?.last_name),
+            email: str(contact.email) || email,
+            Email: str(contact.email) || email,
+          },
           data: payload,
           recorded,
         }),
@@ -107,6 +141,16 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true, recorded, makeOk });
+}
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+}
+
+function str(v: unknown): string {
+  if (typeof v === "string" && v.trim()) return v.trim();
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  return "";
 }
 
 export async function GET() {
