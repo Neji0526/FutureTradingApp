@@ -33,11 +33,9 @@ const RESOLUTIONS = [
   { label: "1D", seconds: 86400 },
 ];
 
-// Minimum bars before we reveal the chart (hide the loading spinner) and lock the
-// initial fit. Below this we keep the spinner up and re-fit each frame, so the
-// sparse "live bars only" first response from the backend isn't shown as a lonely
-// 1–2 candle sliver while the full history backfills.
-const REVEAL_MIN_BARS = 5;
+// Minimum bars before we reveal the chart (hide the loading spinner). dxFeed often
+// has quote entitlement without Candle history — charts start from a few live bars.
+const REVEAL_MIN_BARS = 1;
 
 // How many bars of history to request per resolution. 1m is sized to ~7 trading
 // days (CME trades ~23h/day ≈ 1,380 one-minute bars/day); coarser frames cover
@@ -359,9 +357,9 @@ export function CandleChart({ symbol }: { symbol: string }) {
   }, [precision, tickSize]);
 
   // Frame the opening view on the most recent `DEFAULT_VISIBLE_BARS` bars (the deep
-  // history stays scrollable to the left), then release price auto-fit so vertical
-  // panning works. Shared by the initial load and the reset-zoom button.
-  const showDefaultView = useCallback((len: number) => {
+  // history stays scrollable to the left). Keep price autoScale ON so symbol switches
+  // (ES→NQ/YM/GC) always refit — locking autoScale was the main "blank chart" bug.
+  const showDefaultView = useCallback((len: number, _priceLo?: number, _priceHi?: number) => {
     const chart = chartRef.current;
     if (!chart) return;
     if (len > DEFAULT_VISIBLE_BARS) {
@@ -370,7 +368,6 @@ export function CandleChart({ symbol }: { symbol: string }) {
       chart.timeScale().fitContent();
     }
     chart.priceScale("right").applyOptions({ autoScale: true });
-    window.setTimeout(() => chartRef.current?.priceScale("right").applyOptions({ autoScale: false }), 60);
   }, []);
 
   // Load history for the current symbol/resolution, re-polling a few times until
@@ -402,23 +399,38 @@ export function CandleChart({ symbol }: { symbol: string }) {
         volumeRef.current?.setData([]);
         lastCandleRef.current = null;
         lastVolumeRef.current = null;
+        // Reset scale + format for the new instrument before bars arrive.
+        candleRef.current?.applyOptions({
+          priceFormat: { type: "price", precision, minMove: tickSize },
+        });
         chartRef.current?.priceScale("right").applyOptions({ autoScale: true });
       }
 
       const render = (raw: { time: number; open: number; high: number; low: number; close: number; volume: number }[]) => {
         if (!candleRef.current || !volumeRef.current) return;
-        // Drop any whitespace/invalid bars (non-finite or non-positive OHLC). Gaps in the
-        // data (feed interruptions, weekends) are left as-is — lightweight-charts shows the
-        // empty stretch rather than fabricating flat bars across it.
-        const candles = raw.filter(
+        // Drop invalid bars. Also drop leading flat zero-volume pads — they stretch the
+        // time axis so the few real live candles become invisible hairlines (blank chart
+        // on YM/NQ/GC while ES still showed a small cluster on the far right).
+        const snap = (p: number) => Math.round(p / tickSize) * tickSize;
+        const valid = raw.filter(
           (c) => Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close) && c.low > 0,
         );
+        let start = 0;
+        while (start < valid.length) {
+          const c = valid[start]!;
+          const flat = c.open === c.high && c.high === c.low && c.low === c.close;
+          if (!flat || (c.volume ?? 0) > 0) break;
+          start += 1;
+        }
+        // Keep at least a few bars if everything was flat (still better than empty).
+        if (start >= valid.length && valid.length) start = Math.max(0, valid.length - 30);
+        const candles = valid.slice(start);
         const candleData: CandlestickData<UTCTimestamp>[] = candles.map((c) => ({
           time: c.time as UTCTimestamp,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
+          open: snap(c.open),
+          high: snap(c.high),
+          low: snap(c.low),
+          close: snap(c.close),
         }));
         const volDataRaw: HistogramData<UTCTimestamp>[] = candles.map((c) => ({
           time: c.time as UTCTimestamp,
@@ -433,14 +445,17 @@ export function CandleChart({ symbol }: { symbol: string }) {
         lastCandleRef.current = candleData2[candleData2.length - 1] ?? null;
         lastVolumeRef.current = volData[volData.length - 1] ?? null;
         if (showSpinner && !framed) {
-          // Frame a readable recent window (deep history stays scrollable to the left)
-          // and release the price auto-fit so traders can pan vertically. RE-APPLY on
-          // each frame while the data is still deepening: a shallow→deep load adds bars
-          // on the LEFT, shifting logical indices, so a one-time fit would leave the
-          // view pinned to the wrong bars once the full history lands. Re-anchoring to
-          // the last N bars keeps the same recent time window (no visible jump). A
-          // silent refresh (showSpinner=false) never re-frames — it keeps the user's view.
-          showDefaultView(candleData2.length); // frame against the actual (gap-filled) series length
+          let lo = Infinity;
+          let hi = -Infinity;
+          for (const c of candleData2) {
+            if (c.low < lo) lo = c.low;
+            if (c.high > hi) hi = c.high;
+          }
+          showDefaultView(
+            candleData2.length,
+            Number.isFinite(lo) ? lo : undefined,
+            Number.isFinite(hi) ? hi : undefined,
+          );
           // Completion check uses REAL bar count (not synthetic fills) so a thin feed still deepens.
           if (candleData.length >= target * 0.9 || candleData.length >= target - 1) framed = true;
         }
@@ -489,7 +504,7 @@ export function CandleChart({ symbol }: { symbol: string }) {
       };
       void poll();
     },
-    [symbol, resolution, showDefaultView],
+    [symbol, resolution, showDefaultView, tickSize],
   );
 
   // Initial load + whenever symbol/resolution changes.
@@ -542,7 +557,7 @@ export function CandleChart({ symbol }: { symbol: string }) {
   const quote = useMarketStore((s) => s.quotes[symbol]);
   useEffect(() => {
     if (!quote || !candleRef.current || loading) return;
-    const price = quote.price;
+    const price = Math.round(quote.price / tickSize) * tickSize;
     // Ignore quotes with no real price (e.g. a stale/empty snapshot when the market is
     // closed). Building a bar from one yields a NaN/zero-price candle that renders as an
     // empty slot — that's what opened the weekend "gap" between Fri close and Sun open.
@@ -571,6 +586,16 @@ export function CandleChart({ symbol }: { symbol: string }) {
       }
       next = { time: bucket, open: price, high: price, low: price, close: price };
       nextVol = { time: bucket, value: size, color: upColor }; // new bar opens flat → up tone
+      // First bar on an empty series: setData (update() alone can fail to paint).
+      if (!last) {
+        candleRef.current.setData([next]);
+        volumeRef.current?.setData([nextVol]);
+        lastCandleRef.current = next;
+        lastVolumeRef.current = nextVol;
+        barCountRef.current = 1;
+        showDefaultView(1, price, price);
+        return;
+      }
     } else {
       next = {
         time: last.time,
@@ -587,7 +612,7 @@ export function CandleChart({ symbol }: { symbol: string }) {
     lastVolumeRef.current = nextVol;
     candleRef.current.update(next);
     volumeRef.current?.update(nextVol);
-  }, [quote, resolution, loading]);
+  }, [quote, resolution, loading, tickSize, showDefaultView]);
 
   // Draw / clear the dashed order line while a ticket is open.
   useEffect(() => {
@@ -1061,7 +1086,6 @@ export function CandleChart({ symbol }: { symbol: string }) {
       window.setTimeout(() => {
         const ps = chartRef.current?.priceScale("right");
         ps?.applyOptions({ autoScale: true });
-        window.setTimeout(() => ps?.applyOptions({ autoScale: false }), 80);
       }, 250);
     }
   }
@@ -1078,7 +1102,12 @@ export function CandleChart({ symbol }: { symbol: string }) {
   };
   const resetZoom = () => {
     // Back to the default recent window (not all ~7 days), then release price auto-fit.
-    showDefaultView(barCountRef.current);
+    const last = lastCandleRef.current;
+    if (last) {
+      showDefaultView(barCountRef.current, last.low, last.high);
+    } else {
+      showDefaultView(barCountRef.current);
+    }
   };
 
   // Move a working order's lightweight-charts line live during a drag.

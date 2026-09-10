@@ -60,7 +60,9 @@ export default function TradePage() {
         </Card>
 
         <Card className="h-[480px] overflow-hidden lg:h-[calc(100vh-13rem)] lg:min-h-[440px]">
-          <AdvancedChart symbol={symbol} />
+          {/* Remount on symbol change so price scale / series state from ES (~7600)
+              cannot leave NQ/YM/GC candles off-screen (looks like an empty chart). */}
+          <AdvancedChart key={symbol} symbol={symbol} />
         </Card>
       </div>
 
