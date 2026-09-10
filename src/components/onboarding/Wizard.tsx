@@ -7,6 +7,8 @@ import { Section } from "./Section";
 import { TextField, SelectField, FileField, CheckboxField } from "./fields";
 import { AGE_RANGES, COUNTRIES, ID_DOCUMENT_TYPES, ADDRESS_PROOF_TYPES, STEPS } from "./data";
 import { IconCheck, IconLock } from "./icons";
+import { LegalDocumentModal } from "./LegalDocumentModal";
+import { TERMS_AND_PRIVACY } from "./legal-content";
 import { USE_MOCK_FEED } from "@/lib/constants";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -64,6 +66,9 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [legalOpen, setLegalOpen] = useState(false);
+  /** Step 3: user must open Launch Platform before Complete registration is enabled. */
+  const [launchReviewed, setLaunchReviewed] = useState(false);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -85,6 +90,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     identity: Boolean(form.idType && form.idFile),
     address: Boolean(form.addressType && form.addressFile),
     payment: true,
+    launch: launchReviewed,
   };
 
   function validate(): boolean {
@@ -186,7 +192,12 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     setOpen(1);
   }
 
-  const toggle = (n: number) => setOpen((o) => (o === n ? 0 : n));
+  const toggle = (n: number) => {
+    if (step === 2 && n === 2) setLaunchReviewed(true);
+    setOpen((o) => (o === n ? 0 : n));
+  };
+
+  const canSubmitFinal = step !== STEPS.length - 1 || launchReviewed;
 
   if (done) {
     return (
@@ -217,7 +228,16 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_1fr] lg:gap-12">
       <div className="lg:sticky lg:top-24 lg:self-start">
-        <JourneySidebar current={step} />
+        <JourneySidebar
+          current={step}
+          onSelect={(index) => {
+            if (index === step) return;
+            setErrors({});
+            setSubmitError(null);
+            setStep(index);
+            setOpen(1);
+          }}
+        />
       </div>
 
       <div>
@@ -333,12 +353,45 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                   <CheckboxField
                     checked={form.acceptTerms}
                     error={errors.acceptTerms}
-                    onChange={(v) => set("acceptTerms", v)}
+                    onChange={(v) => {
+                      if (!v) {
+                        set("acceptTerms", false);
+                        return;
+                      }
+                      // Must read and accept the combined legal document first.
+                      if (!form.acceptTerms) {
+                        setLegalOpen(true);
+                        return;
+                      }
+                      set("acceptTerms", true);
+                    }}
                     label={
                       <>
                         I have read and accept the{" "}
-                        <span className="font-semibold text-[var(--l-ink)]">Terms of Service</span> and{" "}
-                        <span className="font-semibold text-[var(--l-ink)]">Privacy Policy</span>.
+                        <button
+                          type="button"
+                          className="font-semibold text-[var(--l-ink)] underline decoration-[var(--l-line)] underline-offset-2 hover:decoration-[var(--l-ink)]"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setLegalOpen(true);
+                          }}
+                        >
+                          Terms of Service
+                        </button>{" "}
+                        and{" "}
+                        <button
+                          type="button"
+                          className="font-semibold text-[var(--l-ink)] underline decoration-[var(--l-line)] underline-offset-2 hover:decoration-[var(--l-ink)]"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setLegalOpen(true);
+                          }}
+                        >
+                          Privacy Policy
+                        </button>
+                        .
                       </>
                     }
                   />
@@ -469,6 +522,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
               <Section
                 index={2}
                 title="Launch Platform"
+                complete={complete.launch}
                 open={open === 2}
                 onToggle={() => toggle(2)}
               >
@@ -502,8 +556,8 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
           <button
             type="button"
             onClick={() => void next()}
-            disabled={submitting}
-            className="l-cta rounded-lg px-6 py-2.5 text-[13.5px] font-bold disabled:opacity-60"
+            disabled={submitting || !canSubmitFinal}
+            className="l-cta rounded-lg px-6 py-2.5 text-[13.5px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting
               ? "Working…"
@@ -513,6 +567,18 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
           </button>
         </div>
       </div>
+
+      <LegalDocumentModal
+        open={legalOpen}
+        title="Terms of Service & Privacy Policy"
+        body={TERMS_AND_PRIVACY}
+        onClose={() => setLegalOpen(false)}
+        onAccept={() => {
+          set("acceptTerms", true);
+          setErrors((e) => (e.acceptTerms ? { ...e, acceptTerms: "" } : e));
+          setLegalOpen(false);
+        }}
+      />
     </div>
   );
 }

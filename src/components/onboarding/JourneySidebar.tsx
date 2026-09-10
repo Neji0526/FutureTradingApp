@@ -1,11 +1,19 @@
+"use client";
+
 import { STEPS } from "./data";
 import { STEP_ICONS, IconCheck } from "./icons";
 
 /**
- * "Your journey" rail. Steps read done / current / upcoming from `current`
- * (a zero-based index), with a connector drawn between consecutive markers.
+ * "Your journey" rail. Every step is clickable so the user can jump between
+ * Account Setup, Verification, and Fund & Trade to review each screen.
  */
-export function JourneySidebar({ current }: { current: number }) {
+export function JourneySidebar({
+  current,
+  onSelect,
+}: {
+  current: number;
+  onSelect: (index: number) => void;
+}) {
   return (
     <aside className="rounded-2xl bg-[#eef2f8] p-6 sm:p-7">
       <h2 className="l-serif text-[17px] text-[var(--l-body)]">Your journey</h2>
@@ -19,7 +27,6 @@ export function JourneySidebar({ current }: { current: number }) {
 
           return (
             <li key={s.key} className="relative flex gap-4 pb-7 last:pb-0">
-              {/* Connector to the next marker. */}
               {!last && (
                 <span
                   aria-hidden
@@ -30,32 +37,44 @@ export function JourneySidebar({ current }: { current: number }) {
                 />
               )}
 
-              <span
+              <button
+                type="button"
+                onClick={() => onSelect(i)}
+                aria-current={active ? "step" : undefined}
                 className={[
-                  "relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                  done
-                    ? "bg-[var(--l-red)] p-2.5 text-white"
-                    : active
-                      ? "border-2 border-[var(--l-red)] bg-white p-2 text-[var(--l-red)]"
-                      : "bg-[var(--l-ink)]/[0.06] p-2 text-[var(--l-body)]/60",
+                  "relative z-10 flex w-full items-start gap-4 rounded-xl text-left transition-colors",
+                  "hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--l-blue-500)]/30",
+                  active ? "bg-white/80" : "",
+                  "-mx-2 px-2 py-1.5",
                 ].join(" ")}
               >
-                {done ? <IconCheck /> : <Icon />}
-              </span>
-
-              <span className="pt-1">
                 <span
                   className={[
-                    "block text-[13.5px] font-bold",
-                    active || done ? "text-[var(--l-ink)]" : "text-[var(--l-body)]",
+                    "relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                    done
+                      ? "bg-[var(--l-red)] p-2.5 text-white"
+                      : active
+                        ? "border-2 border-[var(--l-red)] bg-white p-2 text-[var(--l-red)]"
+                        : "bg-[var(--l-ink)]/[0.06] p-2 text-[var(--l-body)]/60",
                   ].join(" ")}
                 >
-                  {s.title}
+                  {done ? <IconCheck /> : <Icon />}
                 </span>
-                <span className="mt-0.5 block text-[11.5px] text-[var(--l-body)]">
-                  Step {i + 1} of {STEPS.length}
+
+                <span className="min-w-0 pt-1">
+                  <span
+                    className={[
+                      "block text-[13.5px] font-bold",
+                      active || done ? "text-[var(--l-ink)]" : "text-[var(--l-body)]",
+                    ].join(" ")}
+                  >
+                    {s.title}
+                  </span>
+                  <span className="mt-0.5 block text-[11.5px] text-[var(--l-body)]">
+                    Step {i + 1} of {STEPS.length}
+                  </span>
                 </span>
-              </span>
+              </button>
             </li>
           );
         })}
