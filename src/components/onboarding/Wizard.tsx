@@ -7,6 +7,7 @@ import { Section } from "./Section";
 import { TextField, SelectField, FileField, CheckboxField } from "./fields";
 import { AGE_RANGES, COUNTRIES, ID_DOCUMENT_TYPES, ADDRESS_PROOF_TYPES, STEPS } from "./data";
 import { IconCheck, IconLock } from "./icons";
+import { USE_MOCK_FEED } from "@/lib/constants";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -23,9 +24,9 @@ interface Form {
   acceptTerms: boolean;
   acceptRisk: boolean;
   idType: string;
-  idFile?: string;
+  idFile?: File;
   addressType: string;
-  addressFile?: string;
+  addressFile?: File;
 }
 
 const EMPTY: Form = {
@@ -49,12 +50,11 @@ const HEADINGS = [
 ];
 
 /**
- * Three-step onboarding wizard.
+ * Three-step purchase-gated registration wizard.
  *
- * State is held in the component and nothing is persisted — the API routes that
- * would validate the order, create the user and store KYC documents are
- * deliberately out of scope. Each step validates on Continue so the flow can be
- * exercised end to end.
+ * Final submit posts multipart data (including KYC files) to
+ * `/api/onboarding/complete`, which verifies the purchase, creates the user,
+ * stores the full profile, and burns the order.
  */
 export function Wizard({ orderNumber }: { orderNumber: string }) {
   const [step, setStep] = useState(0);
@@ -62,6 +62,8 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -71,8 +73,13 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
   /** Which sections of the current step are filled in — drives the tick badges. */
   const complete: Record<string, boolean> = {
     account: Boolean(
-      form.firstName && form.lastName && EMAIL_RE.test(form.email) && form.password.length >= 8 &&
-        form.password === form.confirm && form.ageRange && form.country,
+      form.firstName &&
+        form.lastName &&
+        EMAIL_RE.test(form.email) &&
+        form.password.length >= 8 &&
+        form.password === form.confirm &&
+        form.ageRange &&
+        form.country,
     ),
     documents: form.acceptTerms && form.acceptRisk,
     identity: Boolean(form.idType && form.idFile),
@@ -115,14 +122,62 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     return true;
   }
 
-  function next() {
+  async function next() {
     if (!validate()) return;
-    if (step === STEPS.length - 1) {
+    if (step !== STEPS.length - 1) {
+      setStep((s) => s + 1);
+      setOpen(1);
+      return;
+    }
+
+    setSubmitError(null);
+    setSubmitting(true);
+
+    // Without a backend, keep the UI exercisable but do not invent a purchase.
+    if (USE_MOCK_FEED) {
+      setSubmitting(false);
       setDone(true);
       return;
     }
-    setStep((s) => s + 1);
-    setOpen(1);
+
+    try {
+      const body = new FormData();
+      body.set("orderNumber", orderNumber);
+      body.set("email", form.email.trim());
+      body.set("password", form.password);
+      body.set("firstName", form.firstName.trim());
+      body.set("lastName", form.lastName.trim());
+      body.set("ageRange", form.ageRange);
+      body.set("country", form.country);
+      body.set("acceptTerms", String(form.acceptTerms));
+      body.set("acceptRisk", String(form.acceptRisk));
+      body.set("idType", form.idType);
+      body.set("addressType", form.addressType);
+      if (form.idFile) body.set("idFile", form.idFile);
+      if (form.addressFile) body.set("addressFile", form.addressFile);
+
+      const res = await fetch("/api/onboarding/complete", {
+        method: "POST",
+        body,
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          setSubmitError(data.error ?? "Purchase not found. Please purchase a subscription.");
+        } else {
+          setSubmitError(data.error ?? "Could not complete onboarding.");
+        }
+        setSubmitting(false);
+        return;
+      }
+
+      setDone(true);
+    } catch {
+      setSubmitError("Could not reach the server. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function back() {
@@ -144,7 +199,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
         </h1>
         <p className="mt-3 text-[14.5px] leading-relaxed text-[var(--l-body)]">
           Order <span className="nums font-semibold text-[var(--l-ink)]">{orderNumber}</span> has been
-          redeemed. Your credentials are on their way to{" "}
+          redeemed. Sign in with{" "}
           <span className="font-semibold text-[var(--l-ink)]">{form.email}</span>.
         </p>
         <Link
@@ -281,7 +336,8 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                     onChange={(v) => set("acceptTerms", v)}
                     label={
                       <>
-                        I have read and accept the <span className="font-semibold text-[var(--l-ink)]">Terms of Service</span> and{" "}
+                        I have read and accept the{" "}
+                        <span className="font-semibold text-[var(--l-ink)]">Terms of Service</span> and{" "}
                         <span className="font-semibold text-[var(--l-ink)]">Privacy Policy</span>.
                       </>
                     }
@@ -329,9 +385,12 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                   <FileField
                     label="Upload document"
                     required
-                    fileName={form.idFile}
+                    file={form.idFile}
                     error={errors.idFile}
-                    onFile={(n) => set("idFile", n)}
+                    onFile={(file, fileError) => {
+                      set("idFile", file);
+                      if (fileError) setErrors((prev) => ({ ...prev, idFile: fileError }));
+                    }}
                     hint="Photo page, in colour, all four corners visible."
                   />
                 </div>
@@ -362,9 +421,12 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                   <FileField
                     label="Upload document"
                     required
-                    fileName={form.addressFile}
+                    file={form.addressFile}
                     error={errors.addressFile}
-                    onFile={(n) => set("addressFile", n)}
+                    onFile={(file, fileError) => {
+                      set("addressFile", file);
+                      if (fileError) setErrors((prev) => ({ ...prev, addressFile: fileError }));
+                    }}
                     hint="Issued within the last 3 months and showing your full address."
                   />
                 </div>
@@ -384,11 +446,13 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                   </p>
 
                   <dl className="mt-4 space-y-3">
-                    {[
-                      ["Order number", orderNumber],
-                      ["Billed to", form.email || "—"],
-                      ["Status", "Paid"],
-                    ].map(([k, v]) => (
+                    {(
+                      [
+                        ["Order number", orderNumber],
+                        ["Billed to", form.email || "—"],
+                        ["Status", "Paid"],
+                      ] as const
+                    ).map(([k, v]) => (
                       <div key={k} className="flex items-center justify-between gap-4">
                         <dt className="text-[13px] text-[var(--l-body)]">{k}</dt>
                         <dd className="nums text-[13px] font-bold text-[var(--l-ink)]">{v}</dd>
@@ -409,27 +473,43 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                 onToggle={() => toggle(2)}
               >
                 <p className="text-[13.5px] leading-relaxed text-[var(--l-body)]">
-                  Completing onboarding redeems order{" "}
+                  Completing registration redeems order{" "}
                   <span className="nums font-semibold text-[var(--l-ink)]">{orderNumber}</span>, creates
-                  your trading account and emails your credentials. An order can only be redeemed once.
+                  your trading account, and burns this purchase so it cannot be reused. Use the same email
+                  you used at checkout.
                 </p>
               </Section>
             </>
           )}
         </div>
 
+        {submitError && (
+          <p className="mt-4 text-[13.5px] font-medium text-[var(--l-red)]" role="alert">
+            {submitError}
+          </p>
+        )}
+
         <div className="mt-8 flex items-center justify-between gap-4 border-t border-[var(--l-line)] pt-7">
           <button
             type="button"
             onClick={back}
-            disabled={step === 0}
+            disabled={step === 0 || submitting}
             className="rounded-lg border border-[var(--l-line)] px-5 py-2.5 text-[13.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Back
           </button>
 
-          <button type="button" onClick={next} className="l-cta rounded-lg px-6 py-2.5 text-[13.5px] font-bold">
-            {step === STEPS.length - 1 ? "Complete onboarding" : "Continue"}
+          <button
+            type="button"
+            onClick={() => void next()}
+            disabled={submitting}
+            className="l-cta rounded-lg px-6 py-2.5 text-[13.5px] font-bold disabled:opacity-60"
+          >
+            {submitting
+              ? "Working…"
+              : step === STEPS.length - 1
+                ? "Complete registration"
+                : "Continue"}
           </button>
         </div>
       </div>

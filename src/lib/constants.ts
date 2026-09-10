@@ -9,6 +9,21 @@ export const USE_MOCK_FEED = !WS_URL;
 export const SESSION_COOKIE = "tp_session";
 
 /**
+ * ClickFunnels checkout / order form URL for purchasing an evaluation.
+ * Unauthenticated landing CTAs send buyers here. Registration happens later on
+ * `/onboarding?order=…` after purchase (standalone `/register` redirects here).
+ */
+export const CLICKFUNNELS_CHECKOUT_URL =
+  process.env.NEXT_PUBLIC_CLICKFUNNELS_URL?.trim() || "https://checkout.enterthevault.co/";
+/**
+ * Make.com scenario webhook that receives purchase events from ClickFunnels
+ * (via `/api/webhooks/clickfunnels`). Server-only — never expose to the client.
+ */
+export const MAKE_WEBHOOK_URL =
+  process.env.MAKE_WEBHOOK_URL?.trim() ||
+  "https://hook.us2.make.com/fu68ssftfj2ivpu3kqgh17wzwsci7gmv";
+
+/**
  * Tradable futures (CME E-mini + Micro). `symbol` is the product root; the
  * backend maps it to the most-active dated contract via Databento continuous
  * symbology and resolves the display code (e.g. ES → ESM6). `basePrice`/`tickSize`

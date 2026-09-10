@@ -111,25 +111,24 @@ export function SelectField({
   );
 }
 
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const ALLOWED_UPLOAD_MIME = new Set(["image/png", "image/jpeg", "application/pdf"]);
+
 /**
- * Document upload control.
- *
- * Presentational only — it reports the chosen file's name so the step can show
- * what was picked, but nothing is transmitted or stored. Uploading is part of
- * the backend work that is explicitly out of scope here.
+ * Document upload control — keeps the chosen File for multipart submit.
  */
 export function FileField({
   label,
   required,
   error,
   hint,
-  fileName,
+  file,
   onFile,
   accept = "image/png,image/jpeg,application/pdf",
   className,
 }: Common & {
-  fileName?: string;
-  onFile: (name: string | undefined) => void;
+  file?: File;
+  onFile: (file: File | undefined, error?: string) => void;
   accept?: string;
   className?: string;
 }) {
@@ -154,7 +153,7 @@ export function FileField({
         </span>
         <span className="min-w-0">
           <span className="block truncate text-[13px] font-semibold text-[var(--l-ink)]">
-            {fileName ?? "Choose a file"}
+            {file?.name ?? "Choose a file"}
           </span>
           <span className="block text-[11.5px] text-[var(--l-body)]">PNG, JPG or PDF · max 10 MB</span>
         </span>
@@ -166,7 +165,25 @@ export function FileField({
         className="sr-only"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errId : undefined}
-        onChange={(e) => onFile(e.target.files?.[0]?.name)}
+        onChange={(e) => {
+          const next = e.target.files?.[0];
+          if (!next) {
+            onFile(undefined);
+            return;
+          }
+          const mime = (next.type || "").toLowerCase();
+          if (!ALLOWED_UPLOAD_MIME.has(mime)) {
+            onFile(undefined, "Documents must be PNG, JPG, or PDF.");
+            e.target.value = "";
+            return;
+          }
+          if (next.size <= 0 || next.size > MAX_UPLOAD_BYTES) {
+            onFile(undefined, "Each document must be under 10 MB.");
+            e.target.value = "";
+            return;
+          }
+          onFile(next);
+        }}
       />
       {error ? <Error id={errId}>{error}</Error> : hint ? (
         <p className="mt-1.5 text-[11.5px] text-[var(--l-body)]">{hint}</p>

@@ -1,6 +1,6 @@
 import type { StepIcon } from "./icons";
 
-/** The three journey steps, mirroring `OnboardingStep` in the Prisma schema. */
+/** The three journey steps for purchase-gated registration. */
 export const STEPS: { key: string; title: string; icon: StepIcon }[] = [
   { key: "ACCOUNT", title: "Account Setup", icon: "user" },
   { key: "VERIFICATION", title: "Verification", icon: "shield" },
@@ -9,7 +9,7 @@ export const STEPS: { key: string; title: string; icon: StepIcon }[] = [
 
 export const AGE_RANGES = ["18 – 24", "25 – 34", "35 – 44", "45 – 54", "55 – 64", "65+"];
 
-/** ISO 3166-1 alpha-2 codes; `country` on Onboarding is VarChar(2). */
+/** ISO 3166-1 alpha-2 codes for country of residence. */
 export const COUNTRIES: { code: string; name: string }[] = [
   { code: "AE", name: "United Arab Emirates" },
   { code: "AR", name: "Argentina" },

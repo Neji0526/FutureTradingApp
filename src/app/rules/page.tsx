@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { SESSION_COOKIE } from "@/lib/constants";
+import { CLICKFUNNELS_CHECKOUT_URL, SESSION_COOKIE } from "@/lib/constants";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { RulesExplorer } from "@/components/rules/RulesExplorer";
 import { IconArrowRight } from "@/components/rules/icons";
@@ -24,7 +24,8 @@ export default async function RulesPage() {
 
   const isAuthed = Boolean(session);
   const portalHref = role === "admin" ? "/admin/traders" : "/dashboard";
-  const ctaHref = isAuthed ? portalHref : "/#pricing";
+  const purchaseHref = CLICKFUNNELS_CHECKOUT_URL || "/#pricing";
+  const ctaHref = isAuthed ? portalHref : purchaseHref;
 
   return (
     <div className="landing min-h-screen bg-white">
@@ -32,7 +33,7 @@ export default async function RulesPage() {
         Skip to content
       </a>
 
-      <LandingNav isAuthed={isAuthed} homeHref={portalHref} />
+      <LandingNav isAuthed={isAuthed} homeHref={portalHref} purchaseHref={purchaseHref} />
 
       <main id="main" className="mx-auto max-w-[900px] px-5 py-14 sm:px-8 sm:py-20">
         <header className="text-center">

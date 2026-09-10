@@ -16,10 +16,12 @@ export function NavMenu({
   links,
   isAuthed,
   homeHref,
+  purchaseHref = "/?notice=purchase",
 }: {
   links: { href: string; label: string }[];
   isAuthed: boolean;
   homeHref: string;
+  purchaseHref?: string;
 }) {
   const [open, setOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -105,7 +107,7 @@ export function NavMenu({
 
             <div className="mt-9 flex justify-center">
               <Link
-                href={isAuthed ? homeHref : "/register"}
+                href={isAuthed ? homeHref : purchaseHref}
                 onClick={close}
                 className="rounded-full bg-[var(--l-red)] px-7 py-3.5 text-[12.5px] font-bold tracking-[0.14em] text-white uppercase transition-transform hover:-translate-y-0.5"
               >

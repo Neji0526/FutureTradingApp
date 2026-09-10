@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { Input, Field } from "@/components/ui/Field";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Icon } from "@/components/icons";
+import { CLICKFUNNELS_CHECKOUT_URL } from "@/lib/constants";
+
+const REGISTER_HREF = CLICKFUNNELS_CHECKOUT_URL || "/?notice=purchase";
 
 function LoginForm() {
   const router = useRouter();
@@ -72,8 +75,8 @@ function LoginForm() {
 
       <div className="text-center text-sm text-muted">
         Don&apos;t have an account?{" "}
-        <Link href="/register" className="font-medium text-primary hover:underline">
-          Register
+        <Link href={REGISTER_HREF} className="font-medium text-primary hover:underline">
+          Purchase &amp; register
         </Link>
       </div>
     </form>

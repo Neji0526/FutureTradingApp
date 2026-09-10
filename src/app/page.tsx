@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { cookies } from "next/headers";
-import { SESSION_COOKIE } from "@/lib/constants";
+import { CLICKFUNNELS_CHECKOUT_URL, SESSION_COOKIE } from "@/lib/constants";
 
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Hero } from "@/components/landing/Hero";
@@ -14,6 +15,7 @@ import { FiveSteps } from "@/components/landing/FiveSteps";
 import { Pricing } from "@/components/landing/Pricing";
 import { Faq } from "@/components/landing/Faq";
 import { LandingFooter } from "@/components/landing/LandingFooter";
+import { PurchaseNotice } from "@/components/landing/PurchaseNotice";
 
 const TITLE = "The Vault — Get funded, keep every dollar you make";
 const DESCRIPTION =
@@ -40,7 +42,9 @@ export default async function Home() {
 
   const isAuthed = Boolean(session);
   const portalHref = role === "admin" ? "/admin/traders" : "/dashboard";
-  const ctaHref = isAuthed ? portalHref : "/register";
+  // Guests buy an evaluation on ClickFunnels; signed-in users go to the portal.
+  const purchaseHref = CLICKFUNNELS_CHECKOUT_URL || "/?notice=purchase";
+  const ctaHref = isAuthed ? portalHref : purchaseHref;
   const ctaLabel = isAuthed ? "Go to your dashboard" : "Get Funded Today";
 
   return (
@@ -49,7 +53,11 @@ export default async function Home() {
         Skip to content
       </a>
 
-      <LandingNav isAuthed={isAuthed} homeHref={portalHref} />
+      <Suspense fallback={null}>
+        <PurchaseNotice />
+      </Suspense>
+
+      <LandingNav isAuthed={isAuthed} homeHref={portalHref} purchaseHref={purchaseHref} />
 
       <main id="main">
         <Hero ctaHref={ctaHref} ctaLabel={ctaLabel} />

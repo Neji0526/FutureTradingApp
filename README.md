@@ -153,6 +153,30 @@ To enable the full Charting Library:
 
 The library is licensed and intentionally **not** bundled here.
 
+## Purchase flow (ClickFunnels → DB → Make.com → registration)
+
+1. Landing CTAs open ClickFunnels (`NEXT_PUBLIC_CLICKFUNNELS_URL`).
+2. On payment, ClickFunnels POSTs to `POST /api/webhooks/clickfunnels` on this app.
+3. That route **records the purchase** on TradingBackend (`email` + `orderNumber`) —
+   the only way a purchase is ever created — then forwards the event to Make.com.
+4. Make emails the buyer a link like `/onboarding?order=ORDER_NUMBER`.
+5. Opening that link validates: order exists, status is `PAID`, not yet redeemed.
+   Failures redirect home with “Please purchase the subscription.”
+6. Completing the wizard (register + purchase confirm) checks the typed email matches
+   the purchase, uploads KYC docs, creates the user + onboarding profile, provisions
+   an evaluation account, and burns the order (`REDEEMED`).
+
+Standalone `/register` redirects to ClickFunnels; the live register UI is onboarding.
+
+Backend endpoints:
+
+- `POST /api/webhooks/clickfunnels` — record purchase
+- `GET /api/purchases/:orderNumber/validate` — page-open gate
+- `POST /api/onboarding/complete` — redeem + create user (via app multipart proxy)
+
+Run `npm run db:migrate` in `FutureTradingBackend` after pulling so the `Purchase`
+table exists when `DATABASE_URL` is set.
+
 ## Notes
 
 - Demo data is deterministic (seeded), so server and client renders match.
