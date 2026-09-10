@@ -41,6 +41,8 @@ interface AuthState {
     password: string,
   ) => Promise<{ ok: boolean; error?: string }>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Cancel own subscription: removes purchase data, blocks login, then signs out. */
+  deactivateSubscription: () => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
   setHydrated: () => void;
 }
@@ -140,6 +142,30 @@ export const useAuthStore = create<AuthState>()(
           const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
           if (res.ok && data.ok) return { ok: true };
           return { ok: false, error: data.error ?? "Could not change password." };
+        } catch {
+          return { ok: false, error: "Could not reach the server. Please try again." };
+        }
+      },
+
+      deactivateSubscription: async () => {
+        if (USE_MOCK_FEED || !API_BASE) {
+          return { ok: false, error: "Deactivating requires the backend (demo mode is read-only)." };
+        }
+        const token = get().token;
+        if (!token) return { ok: false, error: "You must be signed in." };
+        try {
+          const res = await fetch(`${API_BASE}/api/account/deactivate-subscription`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          });
+          const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+          if (!res.ok || !data.ok) {
+            return { ok: false, error: data.error ?? "Could not deactivate subscription." };
+          }
+          // Clear local session without calling logout API (account is already suspended).
+          deleteCookie(SESSION_COOKIE);
+          set({ user: null, token: null });
+          return { ok: true };
         } catch {
           return { ok: false, error: "Could not reach the server. Please try again." };
         }

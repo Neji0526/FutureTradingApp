@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAccountStore } from "@/store/account-store";
 import { useAuthStore } from "@/store/auth-store";
 import type { AccountSummary, Transaction } from "@/lib/types";
@@ -7,6 +9,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Stat } from "@/components/ui/Stat";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { formatCurrency, formatDateTime, clamp, cn } from "@/lib/utils";
 
 const TX_TONE: Record<Transaction["type"], "long" | "short" | "neutral" | "warning" | "info"> = {
@@ -25,10 +28,15 @@ const STATUS_TONE: Record<AccountSummary["status"], "info" | "long" | "short" | 
 };
 
 export default function AccountPage() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const deactivateSubscription = useAuthStore((s) => s.deactivateSubscription);
   const summary = useAccountStore((s) => s.summary);
   const transactions = useAccountStore((s) => s.transactions);
   const violations = useAccountStore((s) => s.violations);
+
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
   if (!summary) return null;
 
@@ -38,6 +46,25 @@ export default function AccountPage() {
   const dailyLossUsed = Math.max(0, -summary.dailyPnl);
   const dailyLossPct = clamp((dailyLossUsed / rule.maxDailyLoss) * 100, 0, 100);
   const drawdownPct = clamp((summary.drawdown / rule.maxDrawdown) * 100, 0, 100);
+
+  async function onDeactivateSubscription() {
+    if (
+      !window.confirm(
+        "Deactivate your subscription? This removes your purchase access and you will be signed out. You will not be able to log in again until you purchase a new subscription.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setFeedback(null);
+    const res = await deactivateSubscription();
+    setBusy(false);
+    if (res.ok) {
+      router.replace("/login");
+      return;
+    }
+    setFeedback({ ok: false, text: res.error ?? "Could not deactivate subscription." });
+  }
 
   return (
     <div>
@@ -116,6 +143,29 @@ export default function AccountPage() {
               <InfoRow label="Account ID" value={<span className="nums">{summary.accountId}</span>} />
               <InfoRow label="Status" value={<Badge tone={STATUS_TONE[summary.status]}>{summary.status}</Badge>} />
               <InfoRow label="Base currency" value={summary.currency} />
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Subscription" subtitle="Manage your purchase access" />
+            <div className="space-y-3 p-4 text-sm">
+              <p className="text-muted">
+                Deactivating removes your purchase data and blocks login. You will need a new subscription to sign in
+                again.
+              </p>
+              {feedback && (
+                <div
+                  className={cn(
+                    "rounded-md px-3 py-2 text-sm",
+                    feedback.ok ? "bg-long/10 text-long" : "bg-short/10 text-short",
+                  )}
+                >
+                  {feedback.text}
+                </div>
+              )}
+              <Button variant="danger" size="sm" loading={busy} onClick={onDeactivateSubscription}>
+                Deactivate subscription
+              </Button>
             </div>
           </Card>
         </div>
