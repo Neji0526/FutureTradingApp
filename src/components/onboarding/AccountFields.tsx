@@ -17,13 +17,13 @@ type Props = {
   form: AccountFormValues;
   errors: Record<string, string>;
   onChange: <K extends keyof AccountFormValues>(key: K, value: AccountFormValues[K]) => void;
-  /** Image 1 (Proof of Address): age spans full width. Image 2 (Launch): half width. */
+  /** When true, age spans the full row (Account Setup layout). */
   ageFullWidth?: boolean;
   showEmailHint?: boolean;
 };
 
 /**
- * Shared registration fields used in Proof of Address and Launch Platform.
+ * Shared registration fields used across Account Setup, Verification, and Launch Platform.
  */
 export function AccountFields({
   form,

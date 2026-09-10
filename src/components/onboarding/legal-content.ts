@@ -109,3 +109,32 @@ For privacy questions or requests, contact us through the channels published on 
 
 By selecting Accept, you confirm that you have read, understood, and agree to both the Terms of Service and the Privacy Policy above.
 `.trim();
+
+/** Condensed trading rules shown in the onboarding Documents step. */
+export const TRADING_RULES = `
+Last updated: September 10, 2026
+
+══════════════════════════════════════
+TRADING RULES (SUMMARY)
+══════════════════════════════════════
+
+1. Evaluation structure
+Two phases, both measured against your starting balance. Phase 1 profit target is 3%. Phase 2 profit target is 6% with a tighter drawdown. There is no time limit on either phase. Minimum trading days: 5 per phase.
+
+2. Drawdown & daily loss
+Phase 1 maximum drawdown: 4% (intraday trailing). Phase 2 maximum drawdown: 3% (intraday trailing). Funded accounts use a 4% end-of-day drawdown floor. Daily loss limit: 2% of account size. A stop-loss is required on every order.
+
+3. Instruments & sessions
+CME futures only (ES, NQ, YM, CL, GC and micros). Overnight and weekend holds are not permitted — open positions are flattened at session end.
+
+4. Funded accounts
+Once funded, the payout / scaling target is 10% of account size with a minimum of 10 trading days. Contract limits scale with account size.
+
+5. Prohibited practices
+Latency arbitrage, multi-account signal farming, cross-account hedging, and holding under 15 seconds (profits voided) are prohibited. Automated strategies are allowed only if every limit is respected.
+
+6. Enforcement
+Breaching maximum drawdown ends the evaluation. Reaching the daily loss limit ends the session only. We may void profits or close accounts that violate these rules.
+
+Full detail is published on the Rules page. By selecting Accept, you confirm that you have read and agree to trade under these rules.
+`.trim();
