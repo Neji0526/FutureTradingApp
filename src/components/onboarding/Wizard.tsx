@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { JourneySidebar } from "./JourneySidebar";
 import { Section } from "./Section";
@@ -66,10 +66,6 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDoc>(null);
-  /** Step 3: user must open Launch Platform before Complete onboarding is enabled. */
-  const [launchReviewed, setLaunchReviewed] = useState(false);
-  const [identityReviewed, setIdentityReviewed] = useState(false);
-  const [addressReviewed, setAddressReviewed] = useState(false);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -86,14 +82,30 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       form.country,
   );
 
+  // Verification / launch sections complete when the profile form is valid —
+  // no extra accordion click required.
   const complete: Record<string, boolean> = {
     account: accountComplete,
     documents: form.acceptTerms && form.acceptRisk,
-    identity: accountComplete && identityReviewed,
-    address: accountComplete && addressReviewed,
+    identity: accountComplete,
+    address: accountComplete,
     payment: true,
-    launch: accountComplete && launchReviewed,
+    launch: accountComplete,
   };
+
+  // On Verification, once identity fields are valid, mark the section complete
+  // and open Proof of Address so the user isn't stuck clicking the header.
+  useEffect(() => {
+    if (step !== 1 || !accountComplete) return;
+    setOpen((o) => (o === 1 ? 2 : o));
+    setErrors((e) => {
+      if (!e.identity && !e.address) return e;
+      const next = { ...e };
+      delete next.identity;
+      delete next.address;
+      return next;
+    });
+  }, [step, accountComplete]);
 
   function validateAccountFields(e: Errors) {
     if (form.firstName.trim().length < 2) e.firstName = "Enter your first name.";
@@ -114,15 +126,8 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       if (!form.acceptRisk) e.acceptRisk = "You must confirm the trading rules to continue.";
     }
 
-    if (step === 1) {
+    if (step === 1 || step === 2) {
       validateAccountFields(e);
-      if (!identityReviewed) e.identity = "Open Identity Documents and confirm your details.";
-      if (!addressReviewed) e.address = "Open Proof of Address and confirm your details.";
-    }
-
-    if (step === 2) {
-      validateAccountFields(e);
-      if (!launchReviewed) e.launch = "Open Launch Platform and confirm your details.";
     }
 
     setErrors(e);
@@ -140,7 +145,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
           !e.country;
         setOpen(docsOnly ? 2 : 1);
       } else if (step === 1) {
-        setOpen(e.identity && !e.firstName ? 1 : e.address && !e.identity ? 2 : 1);
+        setOpen(1);
       } else {
         setOpen(2);
       }
@@ -209,13 +214,8 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
   }
 
   const toggle = (n: number) => {
-    if (step === 1 && n === 1) setIdentityReviewed(true);
-    if (step === 1 && n === 2) setAddressReviewed(true);
-    if (step === 2 && n === 2) setLaunchReviewed(true);
     setOpen((o) => (o === n ? 0 : n));
   };
-
-  const canSubmitFinal = step !== STEPS.length - 1 || complete.launch;
 
   if (done) {
     return (
@@ -388,11 +388,6 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                 onToggle={() => toggle(1)}
               >
                 <AccountFields form={form} errors={errors} onChange={set} />
-                {errors.identity && (
-                  <p className="mt-4 text-[13.5px] font-medium text-[var(--l-red)]" role="alert">
-                    {errors.identity}
-                  </p>
-                )}
               </Section>
 
               <Section
@@ -403,11 +398,6 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                 onToggle={() => toggle(2)}
               >
                 <AccountFields form={form} errors={errors} onChange={set} ageFullWidth />
-                {errors.address && (
-                  <p className="mt-4 text-[13.5px] font-medium text-[var(--l-red)]" role="alert">
-                    {errors.address}
-                  </p>
-                )}
               </Section>
             </>
           )}
@@ -452,11 +442,6 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                 onToggle={() => toggle(2)}
               >
                 <AccountFields form={form} errors={errors} onChange={set} ageFullWidth showEmailHint />
-                {errors.launch && (
-                  <p className="mt-4 text-[13.5px] font-medium text-[var(--l-red)]" role="alert">
-                    {errors.launch}
-                  </p>
-                )}
               </Section>
             </>
           )}
@@ -481,7 +466,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
           <button
             type="button"
             onClick={() => void next()}
-            disabled={submitting || !canSubmitFinal}
+            disabled={submitting}
             className="l-cta rounded-lg px-6 py-2.5 text-[13.5px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting
