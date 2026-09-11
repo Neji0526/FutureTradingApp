@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { MAKE_WEBHOOK_URL } from "@/lib/constants";
 import { getBackendHttpBase } from "@/lib/api-base";
+import {
+  buildOnboardingUrl,
+  isValidOrderNumber,
+  normalizeOrderNumber,
+} from "@/lib/order-number";
 
 export const runtime = "nodejs";
 
@@ -85,23 +90,17 @@ export async function POST(req: Request) {
   // 2) Notify Make.com (non-fatal if Make is down — purchase is already saved).
   let makeOk = false;
   if (MAKE_WEBHOOK_URL) {
-    const recordedPurchase = asRecord(asRecord(recorded)?.purchase);
-    const orderNumber =
-      str(recordedPurchase?.orderNumber) ||
-      str(asRecord(payload)?.order_number) ||
-      str(asRecord(payload)?.orderNumber) ||
-      str(asRecord(asRecord(payload)?.order)?.order_number) ||
-      str(asRecord(asRecord(payload)?.contact)?.id) ||
-      str(asRecord(payload)?.id);
-    const email =
-      str(recordedPurchase?.email) ||
-      str(asRecord(payload)?.email) ||
-      str(asRecord(asRecord(payload)?.contact)?.email);
-    const contact = asRecord(asRecord(payload)?.contact) ?? {};
+    const orderNumber = resolveOrderNumber(recorded, payload);
+    const email = resolveEmail(recorded, payload);
+    const contact = asRecord(asRecord(asRecord(payload)?.data)?.contact)
+      ?? asRecord(asRecord(payload)?.contact)
+      ?? {};
     const contactName =
       str(contact.name) ||
       [str(contact.first_name), str(contact.last_name)].filter(Boolean).join(" ") ||
       str(asRecord(payload)?.name);
+    // Always a clean link — never `?order=#3327` (browser truncates at `#`).
+    const onboardingUrl = orderNumber ? buildOnboardingUrl(orderNumber) : "";
 
     try {
       const upstream = await fetch(MAKE_WEBHOOK_URL, {
@@ -113,18 +112,24 @@ export async function POST(req: Request) {
           // Top-level fields Make can map without digging into nested CF shapes.
           orderNumber,
           order_number: orderNumber,
+          // Display form with # if Make's email copy wants it — do NOT put this in URLs.
+          orderNumberDisplay: orderNumber ? `#${orderNumber}` : "",
+          onboardingUrl,
+          onboarding_url: onboardingUrl,
           email,
           Email: email,
           name: contactName,
           Name: contactName,
-          status: str(asRecord(payload)?.status) || "paid",
+          status: str(asRecord(asRecord(payload)?.data)?.billing_status)
+            || str(asRecord(payload)?.status)
+            || "paid",
           contact: {
             ...contact,
             name: str(contact.name) || contactName,
             first_name: str(contact.first_name) || str(asRecord(payload)?.first_name),
             last_name: str(contact.last_name) || str(asRecord(payload)?.last_name),
-            email: str(contact.email) || email,
-            Email: str(contact.email) || email,
+            email: str(contact.email) || str(contact.email_address) || email,
+            Email: str(contact.email) || str(contact.email_address) || email,
           },
           data: payload,
           recorded,
@@ -141,6 +146,39 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true, recorded, makeOk });
+}
+
+function resolveOrderNumber(recorded: unknown, payload: unknown): string {
+  const recordedPurchase = asRecord(asRecord(recorded)?.purchase);
+  const data = asRecord(asRecord(payload)?.data) ?? asRecord(payload);
+  const candidates = [
+    recordedPurchase?.orderNumber,
+    data?.order_number,
+    data?.orderNumber,
+    asRecord(data?.order)?.order_number,
+    asRecord(payload)?.order_number,
+    asRecord(payload)?.orderNumber,
+  ];
+  for (const c of candidates) {
+    const n = normalizeOrderNumber(str(c));
+    if (isValidOrderNumber(n)) return n;
+  }
+  return "";
+}
+
+function resolveEmail(recorded: unknown, payload: unknown): string {
+  const recordedPurchase = asRecord(asRecord(recorded)?.purchase);
+  const data = asRecord(asRecord(payload)?.data) ?? asRecord(payload);
+  const contact = asRecord(data?.contact) ?? asRecord(asRecord(payload)?.contact);
+  return (
+    str(recordedPurchase?.email) ||
+    str(data?.email) ||
+    str(data?.email_address) ||
+    str(contact?.email) ||
+    str(contact?.email_address) ||
+    str(asRecord(payload)?.email) ||
+    ""
+  ).toLowerCase();
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {

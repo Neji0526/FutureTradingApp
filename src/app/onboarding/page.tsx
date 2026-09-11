@@ -2,21 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Wizard } from "@/components/onboarding/Wizard";
+import { OnboardingOrderGate } from "@/components/onboarding/OnboardingOrderGate";
 import { getBackendHttpBase } from "@/lib/api-base";
+import { isValidOrderNumber, normalizeOrderNumber } from "@/lib/order-number";
 
 export const metadata: Metadata = {
   title: "Register & activate — The Vault",
   description: "Create your account, verify your identity, confirm purchase, and activate trading.",
 };
 
-const ORDER_RE = /^[A-Za-z0-9_-]{4,64}$/;
-
 /**
  * Purchase-gated registration — `/onboarding?order=ORDER_NUMBER`.
  *
- * This is the live register + purchase-confirm flow. The order number comes
- * from the post-purchase email (Make.com). On open we verify the purchase
- * exists, is PAID, and has not been redeemed. Email match is enforced on submit.
+ * Order numbers from ClickFunnels look like "#3327". Email links must use
+ * `?order=3327` (no raw `#`). A broken `?order=#3327` link is recovered on the
+ * client via {@link OnboardingOrderGate}.
  */
 export default async function OnboardingPage({
   searchParams,
@@ -24,9 +24,14 @@ export default async function OnboardingPage({
   searchParams: Promise<{ order?: string }>;
 }) {
   const { order } = await searchParams;
-  const orderNumber = typeof order === "string" ? order.trim() : "";
+  const orderNumber = normalizeOrderNumber(typeof order === "string" ? order : "");
 
-  if (!ORDER_RE.test(orderNumber)) {
+  // Empty / hash-truncated query — don't redirect yet; client may recover from `#3327`.
+  if (!orderNumber) {
+    return <OnboardingOrderGate />;
+  }
+
+  if (!isValidOrderNumber(orderNumber)) {
     redirect("/?notice=purchase");
   }
 

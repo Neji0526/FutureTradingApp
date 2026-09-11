@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { getBackendHttpBase } from "@/lib/api-base";
+import { isValidOrderNumber, normalizeOrderNumber } from "@/lib/order-number";
 
 export const runtime = "nodejs";
 
-const ORDER_RE = /^[A-Za-z0-9_-]{4,64}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const COUNTRY_RE = /^[A-Z]{2}$/;
 
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid form data." }, { status: 400 });
   }
 
-  const orderNumber = str(form.get("orderNumber"));
+  const orderNumber = normalizeOrderNumber(str(form.get("orderNumber")));
   const email = str(form.get("email")).toLowerCase();
   const password = str(form.get("password"));
   const firstName = str(form.get("firstName"));
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   const acceptTerms = str(form.get("acceptTerms")) === "true";
   const acceptRisk = str(form.get("acceptRisk")) === "true";
 
-  if (!ORDER_RE.test(orderNumber)) {
+  if (!isValidOrderNumber(orderNumber)) {
     return NextResponse.json({ error: "Invalid order number." }, { status: 400 });
   }
   if (!EMAIL_RE.test(email)) {
