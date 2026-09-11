@@ -379,8 +379,8 @@ export function CandleChart({ symbol }: { symbol: string }) {
     chart.priceScale("right").applyOptions({ autoScale: true });
   }, []);
 
-  // Paint helper shared by initial load + live poll. Always prefers server bars so
-  // NQ/YM/GC (quote-heavy) look like ES instead of a single flat price line.
+  // Paint helper shared by initial load + occasional history heal.
+  // Prefer natural OHLC (old chart look) — do not invent ±tick wicks on flat bars.
   const paintCandles = useCallback(
     (
       raw: { time: number; open: number; high: number; low: number; close: number; volume: number }[],
@@ -398,9 +398,8 @@ export function CandleChart({ symbol }: { symbol: string }) {
       );
       if (!valid.length) return false;
 
-      // Keep every bar — do NOT strip flats. Thin live feeds (NQ/YM) start with
-      // quote-built bars that can look flat for a few seconds; stripping them left
-      // the chart on a single price line at one timestamp (the bug in screenshots).
+      // Keep every bar — do NOT strip flats. Thin live feeds can start flat;
+      // stripping left a single price line. Autoscale min-span handles visibility.
       const candleData: CandlestickData<UTCTimestamp>[] = valid.map((c) => {
         const open = snap(c.open);
         const close = snap(c.close);
@@ -408,12 +407,6 @@ export function CandleChart({ symbol }: { symbol: string }) {
         let low = snap(c.low);
         high = Math.max(high, open, close);
         low = Math.min(low, open, close);
-        // Guarantee a visible body/wick even on a one-tick bar so the series
-        // never collapses to an invisible flat line on the price axis.
-        if (high === low) {
-          high = high + tickSize;
-          low = low - tickSize;
-        }
         return { time: c.time as UTCTimestamp, open, high, low, close };
       });
       const volDataRaw: HistogramData<UTCTimestamp>[] = valid.map((c, i) => ({
@@ -540,8 +533,9 @@ export function CandleChart({ symbol }: { symbol: string }) {
     }
   }, [wsStatus, loadHistory]);
 
-  // Live sync: pull server live-bars every 1.5s and paint. Source of truth for
-  // every symbol (ES and NQ/YM/GC alike) so a missed WS tick can't freeze the chart.
+  // Occasional history heal (not a live ticker). Old chart: history once, then WS
+  // updates the forming candle. Full setData every 1.5s stomped natural OHLC and
+  // made live markets look flat/flickery. Only repaint when the series grows.
   const [feedEmpty, setFeedEmpty] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -555,25 +549,33 @@ export function CandleChart({ symbol }: { symbol: string }) {
       if (cancelled) return;
       if (!candles.length) {
         emptyStreak += 1;
-        if (emptyStreak >= 3) setFeedEmpty(true);
+        // Never cover an already-painted series (working ES) with the empty overlay.
+        if (emptyStreak >= 3 && barCountRef.current < 1) setFeedEmpty(true);
         return;
       }
       emptyStreak = 0;
       setFeedEmpty(false);
-      // Fit whenever we climb out of a 0–1 bar dead state into a real series.
+      const lastServer = candles[candles.length - 1]!;
+      const lastLocal = lastCandleRef.current;
+      const grew =
+        candles.length > barCountRef.current ||
+        !lastLocal ||
+        Number(lastServer.time) > Number(lastLocal.time) ||
+        (barCountRef.current < 5 && candles.length >= 5);
+      if (!grew) return;
       const needFit = barCountRef.current < 5 && candles.length >= 5;
       paintCandles(candles, { fit: needFit || barCountRef.current < 2, scroll: true });
       setLoading(false);
     };
     void sync();
-    const id = setInterval(() => void sync(), 1_500);
+    const id = setInterval(() => void sync(), 10_000);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
   }, [symbol, resolution, paintCandles]);
 
-  // Live-stream the forming candle from WS quotes between history polls.
+  // Live-stream the forming candle from WS quotes (old chart behavior).
   useEffect(() => {
     const applyQuote = (q: { price: number; bid?: number; ask?: number; lastSize?: number; ts: number }) => {
       if (!candleRef.current) return;
@@ -610,7 +612,7 @@ export function CandleChart({ symbol }: { symbol: string }) {
             }
           }
         }
-        next = { time: bucket, open: price, high: Math.max(price, price + tickSize), low: Math.min(price, price - tickSize), close: price };
+        next = { time: bucket, open: price, high: price, low: price, close: price };
         nextVol = { time: bucket, value: size, color: upColor };
         barCountRef.current += 1;
       } else if (bucket < (last.time as number)) {
@@ -624,10 +626,6 @@ export function CandleChart({ symbol }: { symbol: string }) {
           low: Math.min(last.low, price),
           close: price,
         };
-        if (next.high === next.low) {
-          next.high = next.close + tickSize;
-          next.low = next.close - tickSize;
-        }
         const prevVol = lastVolumeRef.current?.time === last.time ? (lastVolumeRef.current?.value ?? 0) : 0;
         nextVol = {
           time: last.time,
