@@ -400,16 +400,24 @@ export function CandleChart({ symbol }: { symbol: string }) {
 
       // Keep every bar — do NOT strip flats. Thin live feeds can start flat;
       // stripping left a single price line. Autoscale min-span handles visibility.
-      const candleData: CandlestickData<UTCTimestamp>[] = valid.map((c) => {
-        const open = snap(c.open);
-        const close = snap(c.close);
-        let high = snap(c.high);
-        let low = snap(c.low);
-        high = Math.max(high, open, close);
-        low = Math.min(low, open, close);
-        return { time: c.time as UTCTimestamp, open, high, low, close };
-      });
-      const volDataRaw: HistogramData<UTCTimestamp>[] = valid.map((c, i) => ({
+      // Drop dual-contract corrupt candles (high-low spans most of the day range).
+      const maxRange = tickSize * 120;
+      const candleData: CandlestickData<UTCTimestamp>[] = valid
+        .filter((c) => Math.max(c.high, c.open, c.close) - Math.min(c.low, c.open, c.close) <= maxRange)
+        .map((c) => {
+          const open = snap(c.open);
+          const close = snap(c.close);
+          let high = snap(c.high);
+          let low = snap(c.low);
+          high = Math.max(high, open, close);
+          low = Math.min(low, open, close);
+          return { time: c.time as UTCTimestamp, open, high, low, close };
+        });
+      if (!candleData.length) return false;
+      const kept = valid.filter(
+        (c) => Math.max(c.high, c.open, c.close) - Math.min(c.low, c.open, c.close) <= maxRange,
+      );
+      const volDataRaw: HistogramData<UTCTimestamp>[] = kept.map((c, i) => ({
         time: c.time as UTCTimestamp,
         value: c.volume,
         color: (candleData[i]!.close >= candleData[i]!.open) ? "#16c78455" : "#ea394355",
@@ -427,7 +435,7 @@ export function CandleChart({ symbol }: { symbol: string }) {
       lastVolumeRef.current = volData[volData.length - 1] ?? null;
       // Keep header bid/ask/last/volume aligned with the series we just painted —
       // prevents NQ stuck at an old print while candles (if any) moved on.
-      useMarketStore.getState().hydrateQuoteFromCandles(symbol, valid);
+      useMarketStore.getState().hydrateQuoteFromCandles(symbol, kept);
       if (opts?.fit) showDefaultView(candleData2.length);
       if (opts?.scroll !== false) chartRef.current?.timeScale().scrollToRealTime();
       return true;
