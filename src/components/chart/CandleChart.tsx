@@ -38,11 +38,11 @@ const RESOLUTIONS = [
 // days (CME trades ~23h/day ≈ 1,380 one-minute bars/day); coarser frames cover
 // proportionally longer spans. The backend widens its fetch window to match.
 const HISTORY_COUNT: Record<number, number> = {
-  60: 9600, // 1m  → ~7 trading days
-  300: 4000, // 5m  → ~14 trading days
-  900: 2000, // 15m → ~3 weeks
-  3600: 1200, // 1h  → ~6 weeks
-  86400: 500, // 1D  → ~2 years
+  60: 8000, // 1m  → deep when Candle entitled; live merge always
+  300: 4000, // 5m
+  900: 2000, // 15m
+  3600: 1200, // 1h
+  86400: 500, // 1D
 };
 const DEFAULT_HISTORY_COUNT = 500;
 
@@ -235,6 +235,8 @@ export function CandleChart({ symbol }: { symbol: string }) {
   const quote = useMarketStore((s) => s.quotes[symbol]);
   const theme = useThemeStore((s) => s.theme);
   const feedRow = useFeedStatusStore((s) => s.bySymbol[symbol]);
+  const candleEntitled = useFeedStatusStore((s) => s.state?.candleEntitled ?? null);
+  const prevCandleEntitledRef = useRef<boolean | null | undefined>(undefined);
   const feedReason = feedRow?.reason ?? null;
 
   // Resting (working) limit/stop orders for this symbol — drawn on the chart as
@@ -545,17 +547,21 @@ export function CandleChart({ symbol }: { symbol: string }) {
         if (cancelled) return;
         if (candles.length && candles.length >= bestCount) {
           noGrowth = candles.length > bestCount ? 0 : noGrowth + 1;
+          const depthJump = bestCount > 0 && candles.length >= bestCount + 200;
           bestCount = candles.length;
-          // Always fit once we have a real multi-bar series (MES-like candles).
-          const shouldFit = showSpinner && (!fitted || candles.length >= 5);
-          const ok = paintCandles(candles, { fit: shouldFit, scroll: true });
+          // Fit on first real series, or when deep Candle history suddenly arrives
+          // (live-only → deep+live) so the trader sees the full timeline.
+          const shouldFit = showSpinner && (!fitted || candles.length >= 5 || depthJump);
+          const ok = paintCandles(candles, { fit: shouldFit, scroll: shouldFit });
           if (ok && candles.length >= 2) fitted = true;
         } else {
           noGrowth += 1;
         }
         if (bestCount >= 1 || attempt >= 3) setLoading(false);
-        const enough = bestCount >= Math.min(target * 0.9, 30);
-        if (!enough && noGrowth < 4 && attempt < 15) {
+        // Keep polling longer when we may still be waiting on Candle entitlement
+        // (first responses are shallow live bars; deep snapshot arrives later).
+        const enough = bestCount >= Math.min(target * 0.5, 500);
+        if (!enough && noGrowth < 6 && attempt < 20) {
           timer = setTimeout(poll, attempt < 5 ? 1500 : 3000);
         }
       };
@@ -574,6 +580,16 @@ export function CandleChart({ symbol }: { symbol: string }) {
     loadHistory(true);
     return () => loadCleanupRef.current?.();
   }, [loadHistory]);
+
+  // When Volumetrica enables Candle entitlement, deep history becomes available —
+  // re-pull so the chart upgrades from live-only to deep + live without a refresh.
+  useEffect(() => {
+    const prev = prevCandleEntitledRef.current;
+    prevCandleEntitledRef.current = candleEntitled;
+    if (candleEntitled === true && prev === false) {
+      loadHistory(true);
+    }
+  }, [candleEntitled, loadHistory]);
 
   // Backfill the gap when returning to a backgrounded tab. Browsers throttle (or
   // pause) the quote-poll timer while the tab is hidden, so no candles form for
@@ -633,10 +649,11 @@ export function CandleChart({ symbol }: { symbol: string }) {
         Number(lastServer.time) > Number(lastLocal.time) ||
         (barCountRef.current < 5 && candles.length >= 5);
       if (!grew) return;
-      const needFit = barCountRef.current < 5 && candles.length >= 5;
-      // Don't scroll on background heals — setData + scrollToRealTime was yanking
-      // any pan the trader made. shiftVisibleRangeOnNewBar covers the live edge.
-      paintCandles(candles, { fit: needFit || barCountRef.current < 2, scroll: false });
+      const depthJump = candles.length >= barCountRef.current + 200;
+      const needFit = depthJump || (barCountRef.current < 5 && candles.length >= 5);
+      // Don't scroll on background heals unless deep history just arrived —
+      // setData + scrollToRealTime was yanking any pan the trader made.
+      paintCandles(candles, { fit: needFit || barCountRef.current < 2, scroll: depthJump });
       setLoading(false);
     };
     void sync();

@@ -53,6 +53,16 @@ function resolutionToSeconds(resolution: ResolutionString): number {
   return Number.isFinite(n) ? n * 60 : 60;
 }
 
+/** Deep history targets — match CandleChart / backend HISTORY_MAX_BARS. */
+const HISTORY_COUNT: Record<number, number> = {
+  60: 8000,
+  300: 4000,
+  900: 2000,
+  3600: 1200,
+  14400: 800,
+  86400: 500,
+};
+
 interface Subscription {
   symbol: string;
   resolutionSec: number;
@@ -138,18 +148,19 @@ export function createDatafeed() {
       onResult: (bars: Bar[], meta: { noData: boolean }) => void,
       onError: (reason: string) => void,
     ) {
-      // Our backend serves the latest N bars only (no from/to range), so we
-      // only answer the first request and report no older data for paging.
+      // Backend serves latest N bars (Candle snapshot + live merge). First request
+      // pulls deep history when entitled; later paging has no older archive.
       if (!periodParams.firstDataRequest) {
         onResult([], { noData: true });
         return;
       }
       try {
         const sec = resolutionToSeconds(resolution);
+        const target = HISTORY_COUNT[sec] ?? 2000;
         const candles = await getWsClient().getHistory(
           symbolInfo.name,
           sec,
-          Math.max(periodParams.countBack, 240),
+          Math.max(periodParams.countBack, target),
         );
         const bars: Bar[] = candles.map((c) => ({
           time: c.time * 1000,
