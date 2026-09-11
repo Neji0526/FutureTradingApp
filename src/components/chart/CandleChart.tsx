@@ -152,6 +152,9 @@ export function CandleChart({ symbol }: { symbol: string }) {
   // When true, live quotes / history heals snap the viewport to the right edge.
   // Cleared as soon as the trader pans into history so ticks can't yank them back.
   const followLiveRef = useRef(true);
+  // True while the pointer is down on the chart — blocks scrollToRealTime mid-drag
+  // (range-change alone races behind quote ticks and still felt like a snap-back).
+  const userPanningRef = useRef(false);
   const priceLineRef = useRef<IPriceLine | null>(null);
   const slLineRef = useRef<IPriceLine | null>(null);
   const tpLineRef = useRef<IPriceLine | null>(null);
@@ -274,8 +277,18 @@ export function CandleChart({ symbol }: { symbol: string }) {
       },
       crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: { borderColor: c.border },
-      timeScale: { borderColor: c.border, timeVisible: true, secondsVisible: false },
+      timeScale: {
+        borderColor: c.border,
+        timeVisible: true,
+        secondsVisible: false,
+        // Keep the right edge glued only when the trader is already there; panning
+        // left must not be overridden by forming-bar updates.
+        rightBarStaysOnScroll: true,
+        shiftVisibleRangeOnNewBar: true,
+      },
       autoSize: true,
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
     });
 
     const candle = chart.addSeries(CandlestickSeries, {
@@ -337,14 +350,38 @@ export function CandleChart({ symbol }: { symbol: string }) {
       const bars = barCountRef.current;
       if (bars < 2) return;
       const distFromEnd = bars - 1 - range.to;
+      // While dragging, always treat as "not following" so a tick can't win the race.
+      if (userPanningRef.current) {
+        followLiveRef.current = false;
+        return;
+      }
       followLiveRef.current = distFromEnd < 3;
     });
+
+    const onPointerDown = () => {
+      userPanningRef.current = true;
+      followLiveRef.current = false;
+    };
+    const onPointerUp = () => {
+      userPanningRef.current = false;
+      const range = chart.timeScale().getVisibleLogicalRange();
+      const bars = barCountRef.current;
+      if (range && bars >= 2) {
+        followLiveRef.current = bars - 1 - range.to < 3;
+      }
+    };
+    container.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
 
     chartRef.current = chart;
     candleRef.current = candle;
     volumeRef.current = volume;
 
     return () => {
+      container.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
       chart.remove();
       chartRef.current = null;
       candleRef.current = null;
@@ -453,9 +490,13 @@ export function CandleChart({ symbol }: { symbol: string }) {
         followLiveRef.current = true;
         showDefaultView(candleData2.length);
       }
-      // Only stick to the live edge when the trader hasn't panned into history
-      // (and the caller didn't explicitly disable scroll).
-      if (opts?.scroll !== false && followLiveRef.current) {
+      // Never force-scroll during an active drag. Otherwise setData + scroll races
+      // the pointer and snaps the timeline back to "now".
+      if (
+        opts?.scroll !== false &&
+        followLiveRef.current &&
+        !userPanningRef.current
+      ) {
         chartRef.current?.timeScale().scrollToRealTime();
       }
       return true;
@@ -593,7 +634,9 @@ export function CandleChart({ symbol }: { symbol: string }) {
         (barCountRef.current < 5 && candles.length >= 5);
       if (!grew) return;
       const needFit = barCountRef.current < 5 && candles.length >= 5;
-      paintCandles(candles, { fit: needFit || barCountRef.current < 2, scroll: true });
+      // Don't scroll on background heals — setData + scrollToRealTime was yanking
+      // any pan the trader made. shiftVisibleRangeOnNewBar covers the live edge.
+      paintCandles(candles, { fit: needFit || barCountRef.current < 2, scroll: false });
       setLoading(false);
     };
     void sync();
@@ -668,10 +711,10 @@ export function CandleChart({ symbol }: { symbol: string }) {
       try {
         candleRef.current.update(next);
         volumeRef.current?.update(nextVol);
-        // Don't yank the viewport while the trader is scrolling history.
-        if (followLiveRef.current) {
-          chartRef.current?.timeScale().scrollToRealTime();
-        }
+        // Do NOT call scrollToRealTime on quote ticks. Updating the forming bar
+        // used to re-snap the viewport on every print, so drag-pan felt broken.
+        // New bars keep the right edge via timeScale.shiftVisibleRangeOnNewBar
+        // when the trader is already following live.
       } catch {
         /* ignore transient update errors during remount */
       }
