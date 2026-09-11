@@ -59,24 +59,14 @@ export async function POST(req: Request) {
   // 1) Record purchase in our database (source of truth).
   let recorded: unknown = null;
   try {
-    const clientIp =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      req.headers.get("x-real-ip")?.trim() ||
-      "";
     const persist = await fetch(`${backendBase}/api/webhooks/clickfunnels`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
         ...(expected ? { "x-webhook-secret": expected } : {}),
-        ...(clientIp ? { "x-forwarded-for": clientIp, "x-real-ip": clientIp } : {}),
       },
-      body: JSON.stringify({
-        ...(payload && typeof payload === "object" && !Array.isArray(payload)
-          ? (payload as Record<string, unknown>)
-          : { data: payload }),
-        ...(clientIp ? { clientIp } : {}),
-      }),
+      body: JSON.stringify(payload),
     });
     const persistBody = await persist.json().catch(() => ({}));
     if (!persist.ok) {
