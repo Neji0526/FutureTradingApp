@@ -149,6 +149,9 @@ export function CandleChart({ symbol }: { symbol: string }) {
   const lastCandleRef = useRef<CandlestickData<UTCTimestamp> | null>(null);
   const lastVolumeRef = useRef<HistogramData<UTCTimestamp> | null>(null);
   const barCountRef = useRef(0); // bars currently in the series — drives the default visible window
+  // When true, live quotes / history heals snap the viewport to the right edge.
+  // Cleared as soon as the trader pans into history so ticks can't yank them back.
+  const followLiveRef = useRef(true);
   const priceLineRef = useRef<IPriceLine | null>(null);
   const slLineRef = useRef<IPriceLine | null>(null);
   const tpLineRef = useRef<IPriceLine | null>(null);
@@ -327,6 +330,16 @@ export function CandleChart({ symbol }: { symbol: string }) {
       setClickMenu({ x: param.point.x, y: param.point.y, price: price as number });
     });
 
+    // Detect pan/zoom away from the live edge so quote updates stop calling
+    // scrollToRealTime (which was snapping every drag back to "now").
+    chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      if (!range) return;
+      const bars = barCountRef.current;
+      if (bars < 2) return;
+      const distFromEnd = bars - 1 - range.to;
+      followLiveRef.current = distFromEnd < 3;
+    });
+
     chartRef.current = chart;
     candleRef.current = candle;
     volumeRef.current = volume;
@@ -436,8 +449,15 @@ export function CandleChart({ symbol }: { symbol: string }) {
       // Keep header bid/ask/last/volume aligned with the series we just painted —
       // prevents NQ stuck at an old print while candles (if any) moved on.
       useMarketStore.getState().hydrateQuoteFromCandles(symbol, kept);
-      if (opts?.fit) showDefaultView(candleData2.length);
-      if (opts?.scroll !== false) chartRef.current?.timeScale().scrollToRealTime();
+      if (opts?.fit) {
+        followLiveRef.current = true;
+        showDefaultView(candleData2.length);
+      }
+      // Only stick to the live edge when the trader hasn't panned into history
+      // (and the caller didn't explicitly disable scroll).
+      if (opts?.scroll !== false && followLiveRef.current) {
+        chartRef.current?.timeScale().scrollToRealTime();
+      }
       return true;
     },
     [tickSize, resolution, showDefaultView, symbol],
@@ -460,6 +480,7 @@ export function CandleChart({ symbol }: { symbol: string }) {
       // Drop any previous symbol's 1-bar flat series so MNQ can't stay stuck on an
       // old print while waiting for history (looked like a dead chart).
       if (showSpinner) {
+        followLiveRef.current = true; // new symbol/TF → reattach to live edge
         barCountRef.current = 0;
         lastCandleRef.current = null;
         lastVolumeRef.current = null;
@@ -647,7 +668,10 @@ export function CandleChart({ symbol }: { symbol: string }) {
       try {
         candleRef.current.update(next);
         volumeRef.current?.update(nextVol);
-        chartRef.current?.timeScale().scrollToRealTime();
+        // Don't yank the viewport while the trader is scrolling history.
+        if (followLiveRef.current) {
+          chartRef.current?.timeScale().scrollToRealTime();
+        }
       } catch {
         /* ignore transient update errors during remount */
       }
