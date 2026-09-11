@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { JourneySidebar } from "./JourneySidebar";
 import { Section } from "./Section";
@@ -82,8 +82,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       form.country,
   );
 
-  // Verification / launch sections complete when the profile form is valid —
-  // no extra accordion click required.
+  // Verification / launch sections complete when the profile form is valid.
   const complete: Record<string, boolean> = {
     account: accountComplete,
     documents: form.acceptTerms && form.acceptRisk,
@@ -92,20 +91,6 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     payment: true,
     launch: accountComplete,
   };
-
-  // On Verification, once identity fields are valid, mark the section complete
-  // and open Proof of Address so the user isn't stuck clicking the header.
-  useEffect(() => {
-    if (step !== 1 || !accountComplete) return;
-    setOpen((o) => (o === 1 ? 2 : o));
-    setErrors((e) => {
-      if (!e.identity && !e.address) return e;
-      const next = { ...e };
-      delete next.identity;
-      delete next.address;
-      return next;
-    });
-  }, [step, accountComplete]);
 
   function validateAccountFields(e: Errors) {
     if (form.firstName.trim().length < 2) e.firstName = "Enter your first name.";
@@ -384,7 +369,8 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                 index={1}
                 title="Identity Documents"
                 complete={complete.identity}
-                open={open === 1}
+                open
+                alwaysOpen
                 onToggle={() => toggle(1)}
               >
                 <AccountFields form={form} errors={errors} onChange={set} />
@@ -394,7 +380,8 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                 index={2}
                 title="Proof of Address"
                 complete={complete.address}
-                open={open === 2}
+                open
+                alwaysOpen
                 onToggle={() => toggle(2)}
               >
                 <AccountFields form={form} errors={errors} onChange={set} ageFullWidth />
