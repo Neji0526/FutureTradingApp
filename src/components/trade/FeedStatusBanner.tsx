@@ -25,11 +25,10 @@ export function FeedStatusBanner() {
   if (!feed) return null;
 
   const blocked = feed.markets.filter((m) => m.state === "blocked" || !m.entitled);
-  const noCandle = feed.candleEntitled === false;
   const selectedBlocked = row && (row.state === "blocked" || !row.entitled);
   const selectedMissing = row?.state === "missing";
 
-  if (!selectedBlocked && !selectedMissing && !noCandle && blocked.length === 0) {
+  if (!selectedBlocked && !selectedMissing && blocked.length === 0) {
     return null;
   }
 
@@ -49,10 +48,6 @@ export function FeedStatusBanner() {
   } else if (blocked.length) {
     title = "Some symbols are blocked on this gateway";
     body = blocked.map((b) => `${b.symbol}${b.exchange ? ` (${b.exchange})` : ""}`).join(", ");
-  } else if (noCandle) {
-    title = "Chart history is live-bars only";
-    body =
-      "This gateway has no Candle entitlement. Charts build from live prints after the backend starts. Enable Candle history on the dxFeed account for full depth.";
   }
 
   if (!body) return null;
@@ -66,7 +61,6 @@ export function FeedStatusBanner() {
         {feed.exchanges.length > 0 && (
           <p className="mt-1 text-[10px] text-muted">
             Entitled exchanges: {feed.exchanges.join(", ")}
-            {feed.candleEntitled === false ? " · Candle: no" : feed.candleEntitled === true ? " · Candle: yes" : ""}
           </p>
         )}
       </div>
