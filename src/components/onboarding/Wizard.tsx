@@ -475,7 +475,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                           ) : null}
                         </p>
                         <p className="mt-0.5 text-[12.5px] text-[var(--l-body)]">
-                          Sign the dxFeed / Volumetrica data agreement (via Propfirm API key) so live
+                          Sign the dxFeed / Volumetrica data agreement so live
                           market data can be enabled for your account.
                         </p>
                       </div>
