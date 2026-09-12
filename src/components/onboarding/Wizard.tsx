@@ -258,6 +258,65 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     }
   }
 
+  async function resetDxAgreement() {
+    if (USE_MOCK_FEED) {
+      setDx({ required: false, signed: true, link: null, busy: false, error: null });
+      return;
+    }
+    if (!accountComplete) {
+      const e: Errors = {};
+      validateAccountFields(e);
+      setErrors(e);
+      setOpen(1);
+      return;
+    }
+    const ok = window.confirm(
+      "Reset the market data agreement for this purchase? You can prepare and sign again without buying again.",
+    );
+    if (!ok) return;
+
+    setDx((d) => ({ ...d, busy: true, error: null }));
+    try {
+      const res = await fetch("/api/onboarding/dxfeed-agreement/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderNumber,
+          email: form.email.trim(),
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          country: form.country,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        detail?: string;
+        hint?: string;
+        ok?: boolean;
+      };
+      if (!res.ok) {
+        setDx((d) => ({
+          ...d,
+          busy: false,
+          error: formatDxAgreementError(data),
+        }));
+        return;
+      }
+      setDx({
+        required: true,
+        signed: false,
+        link: null,
+        busy: false,
+        error: null,
+      });
+      setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
+      await startDxAgreement();
+    } catch {
+      setDx((d) => ({ ...d, busy: false, error: "Could not reach the server. Try again." }));
+    }
+  }
+
   async function next() {
 
     if (!validate()) return;
@@ -490,13 +549,27 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                         </p>
                         <p className="mt-0.5 text-[12.5px] text-[var(--l-body)]">
                           Sign the dxFeed / Volumetrica data agreement so live
-                          market data can be enabled for your account.
+                          market data can be enabled for your account. If you need
+                          to sign again, use Reset &amp; re-sign — your purchase
+                          stays valid.
                         </p>
                       </div>
                       {dx.signed ? (
-                        <p className="text-[13px] font-semibold text-[var(--l-ink)]">
-                          {dx.required ? "Signed — you can continue." : "Not required on this environment."}
-                        </p>
+                        <div className="space-y-2">
+                          <p className="text-[13px] font-semibold text-[var(--l-ink)]">
+                            {dx.required ? "Signed — you can continue." : "Not required on this environment."}
+                          </p>
+                          {dx.required ? (
+                            <button
+                              type="button"
+                              disabled={dx.busy}
+                              onClick={() => void resetDxAgreement()}
+                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                            >
+                              {dx.busy ? "Working…" : "Reset & re-sign"}
+                            </button>
+                          ) : null}
+                        </div>
                       ) : (
                         <div className="flex flex-wrap items-center gap-2">
                           <button
@@ -527,6 +600,14 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                               </button>
                             </>
                           ) : null}
+                          <button
+                            type="button"
+                            disabled={dx.busy}
+                            onClick={() => void resetDxAgreement()}
+                            className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                          >
+                            {dx.busy ? "Working…" : "Reset & re-sign"}
+                          </button>
                         </div>
                       )}
                       {(errors.dxAgreement || dx.error) && (
@@ -681,7 +762,7 @@ function formatDxAgreementError(data: {
       data.error ??
         "A dxFeed / Volumetrica account or subscription already exists for this email.",
       data.hint ??
-        "Use Check status if you already signed, or contact support to recover the agreement link.",
+        "Use Reset & re-sign below, then Prepare again. Or Check status if you already signed.",
     ].join(" ");
   }
 
