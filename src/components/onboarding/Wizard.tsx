@@ -29,6 +29,14 @@ interface Form {
   acceptRisk: boolean;
 }
 
+interface DxAgreementState {
+  required: boolean;
+  signed: boolean;
+  link: string | null;
+  busy: boolean;
+  error: string | null;
+}
+
 const EMPTY: Form = {
   firstName: "",
   lastName: "",
@@ -39,6 +47,14 @@ const EMPTY: Form = {
   country: "",
   acceptTerms: false,
   acceptRisk: false,
+};
+
+const DX_EMPTY: DxAgreementState = {
+  required: true,
+  signed: false,
+  link: null,
+  busy: false,
+  error: null,
 };
 
 const HEADINGS = [
@@ -66,6 +82,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDoc>(null);
+  const [dx, setDx] = useState<DxAgreementState>(DX_EMPTY);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -82,10 +99,12 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       form.country,
   );
 
+  const dxOk = !dx.required || dx.signed;
+
   // Verification / launch sections complete when the profile form is valid.
   const complete: Record<string, boolean> = {
     account: accountComplete,
-    documents: form.acceptTerms && form.acceptRisk,
+    documents: form.acceptTerms && form.acceptRisk && dxOk,
     identity: accountComplete,
     address: accountComplete,
     payment: true,
@@ -109,6 +128,9 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       validateAccountFields(e);
       if (!form.acceptTerms) e.acceptTerms = "You must accept the user agreement to continue.";
       if (!form.acceptRisk) e.acceptRisk = "You must confirm the trading rules to continue.";
+      if (dx.required && !dx.signed) {
+        e.dxAgreement = "You must sign the market data agreement to continue.";
+      }
     }
 
     if (step === 1 || step === 2) {
@@ -120,7 +142,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     if (Object.keys(e).length) {
       if (step === 0) {
         const docsOnly =
-          (e.acceptTerms || e.acceptRisk) &&
+          (e.acceptTerms || e.acceptRisk || e.dxAgreement) &&
           !e.firstName &&
           !e.lastName &&
           !e.email &&
@@ -139,7 +161,91 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     return true;
   }
 
+
+  async function startDxAgreement() {
+    if (USE_MOCK_FEED) {
+      setDx({ required: false, signed: true, link: null, busy: false, error: null });
+      setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
+      return;
+    }
+    if (!accountComplete) {
+      const e: Errors = {};
+      validateAccountFields(e);
+      setErrors(e);
+      setOpen(1);
+      return;
+    }
+    setDx((d) => ({ ...d, busy: true, error: null }));
+    try {
+      const res = await fetch("/api/onboarding/dxfeed-agreement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderNumber,
+          email: form.email.trim(),
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          country: form.country,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        required?: boolean;
+        agreementSigned?: boolean;
+        agreementLink?: string | null;
+      };
+      if (!res.ok) {
+        setDx((d) => ({ ...d, busy: false, error: data.error ?? "Could not prepare the market data agreement." }));
+        return;
+      }
+      const required = data.required !== false;
+      const signed = data.agreementSigned === true || !required;
+      setDx({ required, signed, link: data.agreementLink ?? null, busy: false, error: null });
+      if (signed) setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
+    } catch {
+      setDx((d) => ({ ...d, busy: false, error: "Could not reach the server. Try again." }));
+    }
+  }
+
+  async function refreshDxAgreement() {
+    if (USE_MOCK_FEED) {
+      setDx({ required: false, signed: true, link: null, busy: false, error: null });
+      return;
+    }
+    setDx((d) => ({ ...d, busy: true, error: null }));
+    try {
+      const res = await fetch("/api/onboarding/dxfeed-agreement/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderNumber, email: form.email.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        required?: boolean;
+        agreementSigned?: boolean;
+        agreementLink?: string | null;
+      };
+      if (!res.ok) {
+        setDx((d) => ({ ...d, busy: false, error: data.error ?? "Could not check agreement status." }));
+        return;
+      }
+      const required = data.required !== false;
+      const signed = data.agreementSigned === true || !required;
+      setDx((d) => ({
+        required,
+        signed,
+        link: data.agreementLink ?? d.link,
+        busy: false,
+        error: signed ? null : "Agreement not signed yet. Open the link, sign, then check again.",
+      }));
+      if (signed) setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
+    } catch {
+      setDx((d) => ({ ...d, busy: false, error: "Could not reach the server. Try again." }));
+    }
+  }
+
   async function next() {
+
     if (!validate()) return;
     if (step !== STEPS.length - 1) {
       setStep((s) => s + 1);
@@ -357,6 +463,64 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                         </>
                       }
                     />
+                  </ConsentBox>
+
+                  <ConsentBox error={errors.dxAgreement || dx.error || undefined}>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="font-semibold text-[var(--l-ink)]">
+                          Market data agreement
+                          {dx.required ? (
+                            <span className="ml-1 text-[var(--l-red)]" aria-hidden>*</span>
+                          ) : null}
+                        </p>
+                        <p className="mt-0.5 text-[12.5px] text-[var(--l-body)]">
+                          Sign the dxFeed / Volumetrica data agreement (via Propfirm API key) so live
+                          market data can be enabled for your account.
+                        </p>
+                      </div>
+                      {dx.signed ? (
+                        <p className="text-[13px] font-semibold text-[var(--l-ink)]">
+                          {dx.required ? "Signed — you can continue." : "Not required on this environment."}
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={dx.busy}
+                            onClick={() => void startDxAgreement()}
+                            className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                          >
+                            {dx.busy ? "Working…" : dx.link ? "Refresh link" : "Prepare agreement"}
+                          </button>
+                          {dx.link ? (
+                            <>
+                              <a
+                                href={dx.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded-lg bg-[var(--l-ink)] px-3.5 py-2 text-[12.5px] font-semibold text-white"
+                              >
+                                Open agreement
+                              </a>
+                              <button
+                                type="button"
+                                disabled={dx.busy}
+                                onClick={() => void refreshDxAgreement()}
+                                className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                              >
+                                I&rsquo;ve signed — check status
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+                      )}
+                      {(errors.dxAgreement || dx.error) && (
+                        <p className="text-[12.5px] font-medium text-[var(--l-red)]" role="alert">
+                          {errors.dxAgreement || dx.error}
+                        </p>
+                      )}
+                    </div>
                   </ConsentBox>
                 </div>
               </Section>
