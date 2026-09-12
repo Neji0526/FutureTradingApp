@@ -464,14 +464,17 @@ export function Wizard({
     };
   }, [orderNumber, returnedFromDxSign, refreshDxAgreement]);
 
-  // Poll while waiting for signature; refresh when tab is focused again.
+  // Poll until Signed — keep going whenever we have a link or just returned from dxFeed.
   useEffect(() => {
-    if (USE_MOCK_FEED || dx.signed || !dx.awaitingSign) return;
+    if (USE_MOCK_FEED || dx.signed) return;
+    if (!dx.awaitingSign && !dx.link && !returnedFromDxSign) return;
 
     const tick = () => {
       if (document.visibilityState === "hidden") return;
       void refreshDxAgreement({ silent: true });
     };
+    // Immediate check, then every few seconds.
+    tick();
     const id = window.setInterval(tick, DX_POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") tick();
@@ -484,7 +487,7 @@ export function Wizard({
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
-  }, [dx.signed, dx.awaitingSign, refreshDxAgreement]);
+  }, [dx.signed, dx.awaitingSign, dx.link, returnedFromDxSign, refreshDxAgreement]);
 
   async function next() {
 
