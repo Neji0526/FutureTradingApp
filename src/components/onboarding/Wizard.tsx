@@ -294,6 +294,8 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
         detail?: string;
         hint?: string;
         ok?: boolean;
+        agreementLink?: string | null;
+        agreementSigned?: boolean;
       };
       if (!res.ok) {
         setDx((d) => ({
@@ -301,6 +303,18 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
           busy: false,
           error: formatDxAgreementError(data),
         }));
+        return;
+      }
+      // Reset may return a refreshed agreement link (force re-sign on existing sub).
+      if (data.agreementLink) {
+        setDx({
+          required: true,
+          signed: data.agreementSigned === true,
+          link: data.agreementLink,
+          busy: false,
+          error: null,
+        });
+        setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
         return;
       }
       setDx({
