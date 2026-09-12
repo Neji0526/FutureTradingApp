@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { JourneySidebar } from "./JourneySidebar";
 import { Section } from "./Section";
@@ -13,6 +13,8 @@ import { TERMS_AND_PRIVACY, TRADING_RULES } from "./legal-content";
 import { USE_MOCK_FEED } from "@/lib/constants";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DX_POLL_MS = 3000;
+const formStorageKey = (order: string) => `vault-onboarding:${order}`;
 
 type Errors = Record<string, string>;
 type LegalDoc = "agreement" | "rules" | null;
@@ -35,6 +37,7 @@ interface DxAgreementState {
   link: string | null;
   busy: boolean;
   error: string | null;
+  awaitingSign: boolean;
 }
 
 const EMPTY: Form = {
@@ -55,6 +58,7 @@ const DX_EMPTY: DxAgreementState = {
   link: null,
   busy: false,
   error: null,
+  awaitingSign: false,
 };
 
 const HEADINGS = [
@@ -73,7 +77,13 @@ const HEADINGS = [
  * Step 2 — Verification: identity + proof of address (profile fields)
  * Step 3 — Fund & Trade: payment confirmation + launch platform
  */
-export function Wizard({ orderNumber }: { orderNumber: string }) {
+export function Wizard({
+  orderNumber,
+  returnedFromDxSign = false,
+}: {
+  orderNumber: string;
+  returnedFromDxSign?: boolean;
+}) {
   const [step, setStep] = useState(0);
   const [open, setOpen] = useState(1);
   const [form, setForm] = useState<Form>(EMPTY);
@@ -83,6 +93,9 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDoc>(null);
   const [dx, setDx] = useState<DxAgreementState>(DX_EMPTY);
+  const formRef = useRef(form);
+  formRef.current = form;
+  const restoredRef = useRef(false);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -162,9 +175,91 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
   }
 
 
+  function persistForm(next: Form = formRef.current) {
+    try {
+      sessionStorage.setItem(formStorageKey(orderNumber), JSON.stringify(next));
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }
+
+  const refreshDxAgreement = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent === true;
+      if (USE_MOCK_FEED) {
+        setDx({
+          required: false,
+          signed: true,
+          link: null,
+          busy: false,
+          error: null,
+          awaitingSign: false,
+        });
+        return true;
+      }
+      const email = formRef.current.email.trim();
+      if (!silent) setDx((d) => ({ ...d, busy: true, error: null }));
+      try {
+        const res = await fetch("/api/onboarding/dxfeed-agreement/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderNumber, email: email || undefined }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          code?: string;
+          detail?: string;
+          hint?: string;
+          required?: boolean;
+          agreementSigned?: boolean;
+          agreementLink?: string | null;
+        };
+        if (!res.ok) {
+          if (!silent) {
+            setDx((d) => ({
+              ...d,
+              busy: false,
+              error: formatDxAgreementError(data),
+            }));
+          }
+          return false;
+        }
+        const required = data.required !== false;
+        const signed = data.agreementSigned === true || !required;
+        setDx((d) => ({
+          required,
+          signed,
+          link: data.agreementLink ?? d.link,
+          busy: false,
+          error: signed
+            ? null
+            : silent
+              ? d.error
+              : "Agreement not signed yet. After you sign on dxFeed you will return here and status updates automatically.",
+          awaitingSign: Boolean(required && !signed && (data.agreementLink ?? d.link)),
+        }));
+        if (signed) setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
+        return signed;
+      } catch {
+        if (!silent) {
+          setDx((d) => ({ ...d, busy: false, error: "Could not reach the server. Try again." }));
+        }
+        return false;
+      }
+    },
+    [orderNumber],
+  );
+
   async function startDxAgreement() {
     if (USE_MOCK_FEED) {
-      setDx({ required: false, signed: true, link: null, busy: false, error: null });
+      setDx({
+        required: false,
+        signed: true,
+        link: null,
+        busy: false,
+        error: null,
+        awaitingSign: false,
+      });
       setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
       return;
     }
@@ -175,6 +270,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       setOpen(1);
       return;
     }
+    persistForm();
     setDx((d) => ({ ...d, busy: true, error: null }));
     try {
       const res = await fetch("/api/onboarding/dxfeed-agreement", {
@@ -201,57 +297,21 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
         setDx((d) => ({
           ...d,
           busy: false,
+          awaitingSign: false,
           error: formatDxAgreementError(data),
         }));
         return;
       }
       const required = data.required !== false;
       const signed = data.agreementSigned === true || !required;
-      setDx({ required, signed, link: data.agreementLink ?? null, busy: false, error: null });
-      if (signed) setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
-    } catch {
-      setDx((d) => ({ ...d, busy: false, error: "Could not reach the server. Try again." }));
-    }
-  }
-
-  async function refreshDxAgreement() {
-    if (USE_MOCK_FEED) {
-      setDx({ required: false, signed: true, link: null, busy: false, error: null });
-      return;
-    }
-    setDx((d) => ({ ...d, busy: true, error: null }));
-    try {
-      const res = await fetch("/api/onboarding/dxfeed-agreement/status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderNumber, email: form.email.trim() }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        code?: string;
-        detail?: string;
-        hint?: string;
-        required?: boolean;
-        agreementSigned?: boolean;
-        agreementLink?: string | null;
-      };
-      if (!res.ok) {
-        setDx((d) => ({
-          ...d,
-          busy: false,
-          error: formatDxAgreementError(data),
-        }));
-        return;
-      }
-      const required = data.required !== false;
-      const signed = data.agreementSigned === true || !required;
-      setDx((d) => ({
+      setDx({
         required,
         signed,
-        link: data.agreementLink ?? d.link,
+        link: data.agreementLink ?? null,
         busy: false,
-        error: signed ? null : "Agreement not signed yet. Open the link, sign, then check again.",
-      }));
+        error: null,
+        awaitingSign: Boolean(required && !signed && data.agreementLink),
+      });
       if (signed) setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
     } catch {
       setDx((d) => ({ ...d, busy: false, error: "Could not reach the server. Try again." }));
@@ -260,7 +320,14 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
 
   async function resetDxAgreement() {
     if (USE_MOCK_FEED) {
-      setDx({ required: false, signed: true, link: null, busy: false, error: null });
+      setDx({
+        required: false,
+        signed: true,
+        link: null,
+        busy: false,
+        error: null,
+        awaitingSign: false,
+      });
       return;
     }
     if (!accountComplete) {
@@ -275,6 +342,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
     );
     if (!ok) return;
 
+    persistForm();
     setDx((d) => ({ ...d, busy: true, error: null }));
     try {
       const res = await fetch("/api/onboarding/dxfeed-agreement/reset", {
@@ -305,7 +373,6 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
         }));
         return;
       }
-      // Reset may return a refreshed agreement link (force re-sign on existing sub).
       if (data.agreementLink) {
         setDx({
           required: true,
@@ -313,6 +380,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
           link: data.agreementLink,
           busy: false,
           error: null,
+          awaitingSign: data.agreementSigned !== true,
         });
         setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
         return;
@@ -323,6 +391,7 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
         link: null,
         busy: false,
         error: null,
+        awaitingSign: false,
       });
       setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
       await startDxAgreement();
@@ -330,6 +399,92 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       setDx((d) => ({ ...d, busy: false, error: "Could not reach the server. Try again." }));
     }
   }
+
+  // Restore draft after dxFeed redirect (or refresh).
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    try {
+      const raw = sessionStorage.getItem(formStorageKey(orderNumber));
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Partial<Form>;
+      setForm((f) => ({
+        ...f,
+        firstName: typeof saved.firstName === "string" ? saved.firstName : f.firstName,
+        lastName: typeof saved.lastName === "string" ? saved.lastName : f.lastName,
+        email: typeof saved.email === "string" ? saved.email : f.email,
+        password: typeof saved.password === "string" ? saved.password : f.password,
+        confirm: typeof saved.confirm === "string" ? saved.confirm : f.confirm,
+        ageRange: typeof saved.ageRange === "string" ? saved.ageRange : f.ageRange,
+        country: typeof saved.country === "string" ? saved.country : f.country,
+        acceptTerms: typeof saved.acceptTerms === "boolean" ? saved.acceptTerms : f.acceptTerms,
+        acceptRisk: typeof saved.acceptRisk === "boolean" ? saved.acceptRisk : f.acceptRisk,
+      }));
+      if (returnedFromDxSign) setOpen(2);
+    } catch {
+      /* ignore */
+    }
+  }, [orderNumber, returnedFromDxSign]);
+
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    persistForm(form);
+  }, [form, orderNumber]);
+
+  // Auto-sync signed state when returning from dxFeed or on load.
+  useEffect(() => {
+    if (USE_MOCK_FEED) return;
+    let cancelled = false;
+    const run = (silent: boolean) => {
+      if (cancelled) return;
+      void refreshDxAgreement({ silent });
+    };
+
+    if (returnedFromDxSign) {
+      run(false);
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has("dxSigned")) {
+          url.searchParams.delete("dxSigned");
+          window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+        }
+      } catch {
+        /* ignore */
+      }
+    } else {
+      const t = window.setTimeout(() => run(true), 500);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(t);
+      };
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orderNumber, returnedFromDxSign, refreshDxAgreement]);
+
+  // Poll while waiting for signature; refresh when tab is focused again.
+  useEffect(() => {
+    if (USE_MOCK_FEED || dx.signed || !dx.awaitingSign) return;
+
+    const tick = () => {
+      if (document.visibilityState === "hidden") return;
+      void refreshDxAgreement({ silent: true });
+    };
+    const id = window.setInterval(tick, DX_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [dx.signed, dx.awaitingSign, refreshDxAgreement]);
 
   async function next() {
 
@@ -563,9 +718,9 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                         </p>
                         <p className="mt-0.5 text-[12.5px] text-[var(--l-body)]">
                           Sign the dxFeed / Volumetrica data agreement so live
-                          market data can be enabled for your account. If you need
-                          to sign again, use Reset &amp; re-sign — your purchase
-                          stays valid.
+                          market data can be enabled for your account. After you
+                          sign, you return here and this step updates to Signed
+                          automatically.
                         </p>
                       </div>
                       {dx.signed ? (
@@ -585,43 +740,51 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
                           ) : null}
                         </div>
                       ) : (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={dx.busy}
-                            onClick={() => void startDxAgreement()}
-                            className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                          >
-                            {dx.busy ? "Working…" : dx.link ? "Refresh link" : "Prepare agreement"}
-                          </button>
-                          {dx.link ? (
-                            <>
-                              <a
-                                href={dx.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded-lg bg-[var(--l-ink)] px-3.5 py-2 text-[12.5px] font-semibold text-white"
-                              >
-                                Open agreement
-                              </a>
-                              <button
-                                type="button"
-                                disabled={dx.busy}
-                                onClick={() => void refreshDxAgreement()}
-                                className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                              >
-                                I&rsquo;ve signed — check status
-                              </button>
-                            </>
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={dx.busy}
+                              onClick={() => void startDxAgreement()}
+                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                            >
+                              {dx.busy ? "Working…" : dx.link ? "Refresh link" : "Prepare agreement"}
+                            </button>
+                            {dx.link ? (
+                              <>
+                                <a
+                                  href={dx.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={() => persistForm()}
+                                  className="rounded-lg bg-[var(--l-ink)] px-3.5 py-2 text-[12.5px] font-semibold text-white"
+                                >
+                                  Open agreement
+                                </a>
+                                <button
+                                  type="button"
+                                  disabled={dx.busy}
+                                  onClick={() => void refreshDxAgreement()}
+                                  className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                                >
+                                  I&rsquo;ve signed — check status
+                                </button>
+                              </>
+                            ) : null}
+                            <button
+                              type="button"
+                              disabled={dx.busy}
+                              onClick={() => void resetDxAgreement()}
+                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                            >
+                              {dx.busy ? "Working…" : "Reset & re-sign"}
+                            </button>
+                          </div>
+                          {dx.awaitingSign ? (
+                            <p className="text-[12.5px] text-[var(--l-body)]">
+                              Waiting for your signature on dxFeed… this updates automatically.
+                            </p>
                           ) : null}
-                          <button
-                            type="button"
-                            disabled={dx.busy}
-                            onClick={() => void resetDxAgreement()}
-                            className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                          >
-                            {dx.busy ? "Working…" : "Reset & re-sign"}
-                          </button>
                         </div>
                       )}
                       {(errors.dxAgreement || dx.error) && (
