@@ -190,12 +190,19 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
+        code?: string;
+        detail?: string;
+        hint?: string;
         required?: boolean;
         agreementSigned?: boolean;
         agreementLink?: string | null;
       };
       if (!res.ok) {
-        setDx((d) => ({ ...d, busy: false, error: data.error ?? "Could not prepare the market data agreement." }));
+        setDx((d) => ({
+          ...d,
+          busy: false,
+          error: formatDxAgreementError(data),
+        }));
         return;
       }
       const required = data.required !== false;
@@ -221,12 +228,19 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
+        code?: string;
+        detail?: string;
+        hint?: string;
         required?: boolean;
         agreementSigned?: boolean;
         agreementLink?: string | null;
       };
       if (!res.ok) {
-        setDx((d) => ({ ...d, busy: false, error: data.error ?? "Could not check agreement status." }));
+        setDx((d) => ({
+          ...d,
+          busy: false,
+          error: formatDxAgreementError(data),
+        }));
         return;
       }
       const required = data.required !== false;
@@ -654,6 +668,29 @@ export function Wizard({ orderNumber }: { orderNumber: string }) {
       />
     </div>
   );
+}
+
+function formatDxAgreementError(data: {
+  error?: string;
+  code?: string;
+  detail?: string;
+  hint?: string;
+}): string {
+  if (data.code === "already_exists") {
+    return [
+      data.error ??
+        "A dxFeed / Volumetrica account or subscription already exists for this email.",
+      data.hint ??
+        "Use Check status if you already signed, or contact support to recover the agreement link.",
+    ].join(" ");
+  }
+
+  const parts = [
+    data.error ?? "Could not prepare the market data agreement.",
+    data.detail ? `Details: ${data.detail}` : null,
+    data.hint ?? "Refresh the page and try again.",
+  ].filter(Boolean);
+  return parts.join(" ");
 }
 
 function ConsentBox({ children, error }: { children: ReactNode; error?: string }) {
