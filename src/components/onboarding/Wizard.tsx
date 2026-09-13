@@ -62,7 +62,10 @@ const DX_EMPTY: DxAgreementState = {
 };
 
 const HEADINGS = [
-  { title: "Create your account", sub: "Set up your profile and trading preferences in minutes." },
+  {
+    title: "Create your account",
+    sub: "Sign the market data agreement first, then set your password and accept the documents.",
+  },
   { title: "Verify your identity", sub: "Complete KYC so we can activate your account securely." },
   {
     title: "Fund & start trading",
@@ -73,7 +76,7 @@ const HEADINGS = [
 /**
  * Three-step purchase-gated registration wizard.
  *
- * Step 1 — Account Setup: account information + legal documents
+ * Step 1 — Account Setup: market data agreement first, then account + legal docs
  * Step 2 — Verification: identity + proof of address (profile fields)
  * Step 3 — Fund & Trade: payment confirmation + launch platform
  */
@@ -85,7 +88,8 @@ export function Wizard({
   returnedFromDxSign?: boolean;
 }) {
   const [step, setStep] = useState(0);
-  const [open, setOpen] = useState(1);
+  // Section 1 = market data (first). Open it when returning from dxFeed sign.
+  const [open, setOpen] = useState(returnedFromDxSign ? 1 : 1);
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [done, setDone] = useState(false);
@@ -102,36 +106,44 @@ export function Wizard({
     setErrors((e) => (e[k] ? { ...e, [k]: "" } : e));
   };
 
-  const accountComplete = Boolean(
+  const identityReady = Boolean(
     form.firstName.trim().length >= 2 &&
       form.lastName.trim().length >= 2 &&
       EMAIL_RE.test(form.email) &&
+      form.country,
+  );
+
+  const accountComplete = Boolean(
+    identityReady &&
       form.password.length >= 8 &&
       form.password === form.confirm &&
-      form.ageRange &&
-      form.country,
+      form.ageRange,
   );
 
   const dxOk = !dx.required || dx.signed;
 
-  // Verification / launch sections complete when the profile form is valid.
   const complete: Record<string, boolean> = {
+    marketData: identityReady && dxOk,
     account: accountComplete,
-    documents: form.acceptTerms && form.acceptRisk && dxOk,
+    documents: form.acceptTerms && form.acceptRisk,
     identity: accountComplete,
     address: accountComplete,
     payment: true,
     launch: accountComplete,
   };
 
-  function validateAccountFields(e: Errors) {
+  function validateIdentityFields(e: Errors) {
     if (form.firstName.trim().length < 2) e.firstName = "Enter your first name.";
     if (form.lastName.trim().length < 2) e.lastName = "Enter your last name.";
     if (!EMAIL_RE.test(form.email.trim())) e.email = "Enter a valid email address.";
+    if (!form.country) e.country = "Select your country.";
+  }
+
+  function validateAccountFields(e: Errors) {
+    validateIdentityFields(e);
     if (form.password.length < 8) e.password = "Use at least 8 characters.";
     if (form.password !== form.confirm) e.confirm = "Passwords do not match.";
     if (!form.ageRange) e.ageRange = "Select your age range.";
-    if (!form.country) e.country = "Select your country.";
   }
 
   function validate(): boolean {
@@ -139,11 +151,11 @@ export function Wizard({
 
     if (step === 0) {
       validateAccountFields(e);
-      if (!form.acceptTerms) e.acceptTerms = "You must accept the user agreement to continue.";
-      if (!form.acceptRisk) e.acceptRisk = "You must confirm the trading rules to continue.";
       if (dx.required && !dx.signed) {
         e.dxAgreement = "You must sign the market data agreement to continue.";
       }
+      if (!form.acceptTerms) e.acceptTerms = "You must accept the user agreement to continue.";
+      if (!form.acceptRisk) e.acceptRisk = "You must confirm the trading rules to continue.";
     }
 
     if (step === 1 || step === 2) {
@@ -154,16 +166,9 @@ export function Wizard({
 
     if (Object.keys(e).length) {
       if (step === 0) {
-        const docsOnly =
-          (e.acceptTerms || e.acceptRisk || e.dxAgreement) &&
-          !e.firstName &&
-          !e.lastName &&
-          !e.email &&
-          !e.password &&
-          !e.confirm &&
-          !e.ageRange &&
-          !e.country;
-        setOpen(docsOnly ? 2 : 1);
+        if (e.dxAgreement || e.firstName || e.lastName || e.email || e.country) setOpen(1);
+        else if (e.password || e.confirm || e.ageRange) setOpen(2);
+        else setOpen(3);
       } else if (step === 1) {
         setOpen(1);
       } else {
@@ -174,10 +179,11 @@ export function Wizard({
     return true;
   }
 
-
   function persistForm(next: Form = formRef.current) {
     try {
-      sessionStorage.setItem(formStorageKey(orderNumber), JSON.stringify(next));
+      // localStorage (not sessionStorage): dxFeed redirect often lands in a new
+      // tab, and sessionStorage is per-tab so the form looked empty on return.
+      localStorage.setItem(formStorageKey(orderNumber), JSON.stringify(next));
     } catch {
       /* ignore quota / private mode */
     }
@@ -263,9 +269,9 @@ export function Wizard({
       setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
       return;
     }
-    if (!accountComplete) {
+    if (!identityReady) {
       const e: Errors = {};
-      validateAccountFields(e);
+      validateIdentityFields(e);
       setErrors(e);
       setOpen(1);
       return;
@@ -330,9 +336,9 @@ export function Wizard({
       });
       return;
     }
-    if (!accountComplete) {
+    if (!identityReady) {
       const e: Errors = {};
-      validateAccountFields(e);
+      validateIdentityFields(e);
       setErrors(e);
       setOpen(1);
       return;
@@ -400,12 +406,15 @@ export function Wizard({
     }
   }
 
-  // Restore draft after dxFeed redirect (or refresh).
+  // Restore draft after dxFeed redirect (or refresh). Uses localStorage so a
+  // redirect into a new tab still recovers name/email/password.
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
     try {
-      const raw = sessionStorage.getItem(formStorageKey(orderNumber));
+      const raw =
+        localStorage.getItem(formStorageKey(orderNumber))
+        ?? sessionStorage.getItem(formStorageKey(orderNumber));
       if (!raw) return;
       const saved = JSON.parse(raw) as Partial<Form>;
       setForm((f) => ({
@@ -420,7 +429,7 @@ export function Wizard({
         acceptTerms: typeof saved.acceptTerms === "boolean" ? saved.acceptTerms : f.acceptTerms,
         acceptRisk: typeof saved.acceptRisk === "boolean" ? saved.acceptRisk : f.acceptRisk,
       }));
-      if (returnedFromDxSign) setOpen(2);
+      setOpen(1);
     } catch {
       /* ignore */
     }
@@ -608,20 +617,136 @@ export function Wizard({
             <>
               <Section
                 index={1}
-                title="Account information"
-                complete={complete.account}
+                title="Market data agreement"
+                complete={complete.marketData}
                 open={open === 1}
                 onToggle={() => toggle(1)}
               >
-                <AccountFields form={form} errors={errors} onChange={set} ageFullWidth showEmailHint />
+                <div className="space-y-5">
+                  <p className="text-[12.5px] text-[var(--l-body)]">
+                    Sign the dxFeed / Volumetrica data agreement first. Enter the
+                    details below (email must match your purchase), prepare the
+                    link, sign, then continue with your account password and
+                    documents. After you sign you return here and your answers
+                    are restored automatically.
+                  </p>
+
+                  <AccountFields
+                    form={form}
+                    errors={errors}
+                    onChange={set}
+                    showEmailHint
+                    variant="identity"
+                  />
+
+                  <ConsentBox error={errors.dxAgreement || dx.error || undefined}>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="font-semibold text-[var(--l-ink)]">
+                          Sign agreement
+                          {dx.required ? (
+                            <span className="ml-1 text-[var(--l-red)]" aria-hidden>*</span>
+                          ) : null}
+                        </p>
+                        <p className="mt-0.5 text-[12.5px] text-[var(--l-body)]">
+                          After you sign on dxFeed you are redirected back to this
+                          page — status updates to Signed automatically.
+                        </p>
+                      </div>
+                      {dx.signed ? (
+                        <div className="space-y-2">
+                          <p className="text-[13px] font-semibold text-[var(--l-ink)]">
+                            {dx.required ? "Signed — you can continue." : "Not required on this environment."}
+                          </p>
+                          {dx.required ? (
+                            <button
+                              type="button"
+                              disabled={dx.busy}
+                              onClick={() => void resetDxAgreement()}
+                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                            >
+                              {dx.busy ? "Working…" : "Reset & re-sign"}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={dx.busy}
+                              onClick={() => void startDxAgreement()}
+                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                            >
+                              {dx.busy ? "Working…" : dx.link ? "Refresh link" : "Prepare agreement"}
+                            </button>
+                            {dx.link ? (
+                              <>
+                                <a
+                                  href={dx.link}
+                                  onClick={() => persistForm()}
+                                  className="rounded-lg bg-[var(--l-ink)] px-3.5 py-2 text-[12.5px] font-semibold text-white"
+                                >
+                                  Open agreement
+                                </a>
+                                <button
+                                  type="button"
+                                  disabled={dx.busy}
+                                  onClick={() => void refreshDxAgreement()}
+                                  className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                                >
+                                  I&rsquo;ve signed — check status
+                                </button>
+                              </>
+                            ) : null}
+                            <button
+                              type="button"
+                              disabled={dx.busy}
+                              onClick={() => void resetDxAgreement()}
+                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                            >
+                              {dx.busy ? "Working…" : "Reset & re-sign"}
+                            </button>
+                          </div>
+                          {dx.awaitingSign ? (
+                            <p className="text-[12.5px] text-[var(--l-body)]">
+                              Waiting for your signature on dxFeed… this updates automatically.
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
+                      {(errors.dxAgreement || dx.error) && (
+                        <p className="text-[12.5px] font-medium text-[var(--l-red)]" role="alert">
+                          {errors.dxAgreement || dx.error}
+                        </p>
+                      )}
+                    </div>
+                  </ConsentBox>
+                </div>
               </Section>
 
               <Section
                 index={2}
-                title="Documents"
-                complete={complete.documents}
+                title="Account information"
+                complete={complete.account}
                 open={open === 2}
                 onToggle={() => toggle(2)}
+              >
+                <AccountFields
+                  form={form}
+                  errors={errors}
+                  onChange={set}
+                  ageFullWidth
+                  variant="security"
+                />
+              </Section>
+
+              <Section
+                index={3}
+                title="Documents"
+                complete={complete.documents}
+                open={open === 3}
+                onToggle={() => toggle(3)}
               >
                 <div className="space-y-4">
                   <ConsentBox error={errors.acceptTerms}>
@@ -708,94 +833,6 @@ export function Wizard({
                         </>
                       }
                     />
-                  </ConsentBox>
-
-                  <ConsentBox error={errors.dxAgreement || dx.error || undefined}>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="font-semibold text-[var(--l-ink)]">
-                          Market data agreement
-                          {dx.required ? (
-                            <span className="ml-1 text-[var(--l-red)]" aria-hidden>*</span>
-                          ) : null}
-                        </p>
-                        <p className="mt-0.5 text-[12.5px] text-[var(--l-body)]">
-                          Sign the dxFeed / Volumetrica data agreement so live
-                          market data can be enabled for your account. After you
-                          sign, you return here and this step updates to Signed
-                          automatically.
-                        </p>
-                      </div>
-                      {dx.signed ? (
-                        <div className="space-y-2">
-                          <p className="text-[13px] font-semibold text-[var(--l-ink)]">
-                            {dx.required ? "Signed — you can continue." : "Not required on this environment."}
-                          </p>
-                          {dx.required ? (
-                            <button
-                              type="button"
-                              disabled={dx.busy}
-                              onClick={() => void resetDxAgreement()}
-                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                            >
-                              {dx.busy ? "Working…" : "Reset & re-sign"}
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              disabled={dx.busy}
-                              onClick={() => void startDxAgreement()}
-                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                            >
-                              {dx.busy ? "Working…" : dx.link ? "Refresh link" : "Prepare agreement"}
-                            </button>
-                            {dx.link ? (
-                              <>
-                                <a
-                                  href={dx.link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={() => persistForm()}
-                                  className="rounded-lg bg-[var(--l-ink)] px-3.5 py-2 text-[12.5px] font-semibold text-white"
-                                >
-                                  Open agreement
-                                </a>
-                                <button
-                                  type="button"
-                                  disabled={dx.busy}
-                                  onClick={() => void refreshDxAgreement()}
-                                  className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                                >
-                                  I&rsquo;ve signed — check status
-                                </button>
-                              </>
-                            ) : null}
-                            <button
-                              type="button"
-                              disabled={dx.busy}
-                              onClick={() => void resetDxAgreement()}
-                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                            >
-                              {dx.busy ? "Working…" : "Reset & re-sign"}
-                            </button>
-                          </div>
-                          {dx.awaitingSign ? (
-                            <p className="text-[12.5px] text-[var(--l-body)]">
-                              Waiting for your signature on dxFeed… this updates automatically.
-                            </p>
-                          ) : null}
-                        </div>
-                      )}
-                      {(errors.dxAgreement || dx.error) && (
-                        <p className="text-[12.5px] font-medium text-[var(--l-red)]" role="alert">
-                          {errors.dxAgreement || dx.error}
-                        </p>
-                      )}
-                    </div>
                   </ConsentBox>
                 </div>
               </Section>
