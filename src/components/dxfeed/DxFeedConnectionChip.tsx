@@ -5,13 +5,16 @@ import { cn } from "@/lib/utils";
 import { useDxFeedActive } from "./useDxFeedActive";
 import { useFeedStatusStore } from "@/store/feed-status-store";
 
+const EMPTY_EXCHANGES: string[] = [];
+
 /**
  * Compact nav chip — visible when dxFeed is the live market-data provider.
  * Shows “Connected dxFeed” plus entitled exchanges when available.
  */
 export function DxFeedConnectionChip({ className }: { className?: string }) {
   const active = useDxFeedActive();
-  const exchanges = useFeedStatusStore((s) => s.state?.exchanges ?? []);
+  // Stable fallback — `?? []` inside a zustand selector causes React #185 (infinite loop).
+  const exchanges = useFeedStatusStore((s) => s.state?.exchanges) ?? EMPTY_EXCHANGES;
 
   if (!active) return null;
 
