@@ -9,12 +9,16 @@ export const STEPS: { key: string; title: string; icon: StepIcon }[] = [
 
 export const AGE_RANGES = ["18 – 24", "25 – 34", "35 – 44", "45 – 54", "55 – 64", "65+"];
 
-/** ISO 3166-1 alpha-2 codes for country of residence. */
+/** ISO 3166-1 alpha-2 codes for country of residence.
+ *  Priority markets are listed first (US, UK, NZ, UAE, Australia), then A–Z. */
 export const COUNTRIES: { code: string; name: string }[] = [
+  { code: "US", name: "United States" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "NZ", name: "New Zealand" },
   { code: "AE", name: "United Arab Emirates" },
+  { code: "AU", name: "Australia" },
   { code: "AR", name: "Argentina" },
   { code: "AT", name: "Austria" },
-  { code: "AU", name: "Australia" },
   { code: "BE", name: "Belgium" },
   { code: "BR", name: "Brazil" },
   { code: "CA", name: "Canada" },
@@ -29,7 +33,6 @@ export const COUNTRIES: { code: string; name: string }[] = [
   { code: "ES", name: "Spain" },
   { code: "FI", name: "Finland" },
   { code: "FR", name: "France" },
-  { code: "GB", name: "United Kingdom" },
   { code: "GR", name: "Greece" },
   { code: "HK", name: "Hong Kong" },
   { code: "HR", name: "Croatia" },
@@ -51,7 +54,6 @@ export const COUNTRIES: { code: string; name: string }[] = [
   { code: "NG", name: "Nigeria" },
   { code: "NL", name: "Netherlands" },
   { code: "NO", name: "Norway" },
-  { code: "NZ", name: "New Zealand" },
   { code: "PE", name: "Peru" },
   { code: "PH", name: "Philippines" },
   { code: "PL", name: "Poland" },
@@ -66,7 +68,6 @@ export const COUNTRIES: { code: string; name: string }[] = [
   { code: "TR", name: "Türkiye" },
   { code: "TW", name: "Taiwan" },
   { code: "UA", name: "Ukraine" },
-  { code: "US", name: "United States" },
   { code: "VN", name: "Vietnam" },
   { code: "ZA", name: "South Africa" },
 ];
