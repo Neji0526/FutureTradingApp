@@ -663,7 +663,7 @@ export function Wizard({
                               type="button"
                               disabled={dx.busy}
                               onClick={() => void resetDxAgreement()}
-                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                              className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
                             >
                               {dx.busy ? "Working…" : "Reset & re-sign"}
                             </button>
@@ -676,7 +676,7 @@ export function Wizard({
                               type="button"
                               disabled={dx.busy}
                               onClick={() => void startDxAgreement()}
-                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                              className="l-cta rounded-md px-3 py-1.5 text-[11.5px] font-semibold tracking-wide disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               {dx.busy ? "Working…" : dx.link ? "Refresh link" : "Prepare agreement"}
                             </button>
@@ -685,7 +685,7 @@ export function Wizard({
                                 <a
                                   href={dx.link}
                                   onClick={() => persistForm()}
-                                  className="rounded-lg bg-[var(--l-ink)] px-3.5 py-2 text-[12.5px] font-semibold text-white"
+                                  className="rounded-md bg-[var(--l-ink)] px-3 py-1.5 text-[11.5px] font-semibold text-white transition-colors hover:opacity-90"
                                 >
                                   Open agreement
                                 </a>
@@ -693,7 +693,7 @@ export function Wizard({
                                   type="button"
                                   disabled={dx.busy}
                                   onClick={() => void refreshDxAgreement()}
-                                  className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                                  className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
                                 >
                                   I&rsquo;ve signed — check status
                                 </button>
@@ -703,7 +703,7 @@ export function Wizard({
                               type="button"
                               disabled={dx.busy}
                               onClick={() => void resetDxAgreement()}
-                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                              className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
                             >
                               {dx.busy ? "Working…" : "Reset & re-sign"}
                             </button>
@@ -921,7 +921,7 @@ export function Wizard({
             type="button"
             onClick={back}
             disabled={step === 0 || submitting}
-            className="rounded-lg border border-[var(--l-line)] px-5 py-2.5 text-[13.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md border border-[var(--l-line)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Back
           </button>
@@ -930,7 +930,7 @@ export function Wizard({
             type="button"
             onClick={() => void next()}
             disabled={submitting}
-            className="l-cta rounded-lg px-6 py-2.5 text-[13.5px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
+            className="l-cta rounded-md px-4 py-1.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting
               ? "Working…"
