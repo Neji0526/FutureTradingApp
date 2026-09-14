@@ -34,7 +34,9 @@ interface Form {
 interface DxAgreementState {
   required: boolean;
   signed: boolean;
-  link: string | null;
+  /** Opaque one-time ticket — never the raw dxFeed URL. */
+  openTicket: string | null;
+  hasLink: boolean;
   busy: boolean;
   error: string | null;
   awaitingSign: boolean;
@@ -55,7 +57,8 @@ const EMPTY: Form = {
 const DX_EMPTY: DxAgreementState = {
   required: true,
   signed: false,
-  link: null,
+  openTicket: null,
+  hasLink: false,
   busy: false,
   error: null,
   awaitingSign: false,
@@ -83,9 +86,11 @@ const HEADINGS = [
 export function Wizard({
   orderNumber,
   returnedFromDxSign = false,
+  openFailed = false,
 }: {
   orderNumber: string;
   returnedFromDxSign?: boolean;
+  openFailed?: boolean;
 }) {
   const [step, setStep] = useState(0);
   // Section 1 = market data (first). Open it when returning from dxFeed sign.
@@ -96,7 +101,15 @@ export function Wizard({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDoc>(null);
-  const [dx, setDx] = useState<DxAgreementState>(DX_EMPTY);
+  const [dx, setDx] = useState<DxAgreementState>(() =>
+    openFailed
+      ? {
+          ...DX_EMPTY,
+          error:
+            "That signing open was already used or expired. Use Refresh link for a new one-time open.",
+        }
+      : DX_EMPTY,
+  );
   const formRef = useRef(form);
   formRef.current = form;
   const restoredRef = useRef(false);
@@ -196,7 +209,8 @@ export function Wizard({
         setDx({
           required: false,
           signed: true,
-          link: null,
+          openTicket: null,
+          hasLink: false,
           busy: false,
           error: null,
           awaitingSign: false,
@@ -218,7 +232,7 @@ export function Wizard({
           hint?: string;
           required?: boolean;
           agreementSigned?: boolean;
-          agreementLink?: string | null;
+          hasLink?: boolean;
         };
         if (!res.ok) {
           if (!silent) {
@@ -233,16 +247,18 @@ export function Wizard({
         const required = data.required !== false;
         const signed = data.agreementSigned === true || !required;
         setDx((d) => ({
+          ...d,
           required,
           signed,
-          link: data.agreementLink ?? d.link,
+          hasLink: signed ? false : data.hasLink === true || d.hasLink,
+          // Status never returns openTicket / raw URL — keep existing ticket.
           busy: false,
           error: signed
             ? null
             : silent
               ? d.error
               : "Agreement not signed yet. After you sign on dxFeed you will return here and status updates automatically.",
-          awaitingSign: Boolean(required && !signed && (data.agreementLink ?? d.link)),
+          awaitingSign: Boolean(required && !signed && (d.openTicket || d.hasLink || data.hasLink)),
         }));
         if (signed) setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
         return signed;
@@ -261,7 +277,8 @@ export function Wizard({
       setDx({
         required: false,
         signed: true,
-        link: null,
+        openTicket: null,
+        hasLink: false,
         busy: false,
         error: null,
         awaitingSign: false,
@@ -297,7 +314,8 @@ export function Wizard({
         hint?: string;
         required?: boolean;
         agreementSigned?: boolean;
-        agreementLink?: string | null;
+        openTicket?: string;
+        hasLink?: boolean;
       };
       if (!res.ok) {
         setDx((d) => ({
@@ -310,13 +328,15 @@ export function Wizard({
       }
       const required = data.required !== false;
       const signed = data.agreementSigned === true || !required;
+      const ticket = typeof data.openTicket === "string" ? data.openTicket : null;
       setDx({
         required,
         signed,
-        link: data.agreementLink ?? null,
+        openTicket: ticket,
+        hasLink: data.hasLink === true || Boolean(ticket),
         busy: false,
         error: null,
-        awaitingSign: Boolean(required && !signed && data.agreementLink),
+        awaitingSign: Boolean(required && !signed && (ticket || data.hasLink)),
       });
       if (signed) setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
     } catch {
@@ -324,12 +344,60 @@ export function Wizard({
     }
   }
 
+  async function openDxAgreement() {
+    const ticket = dx.openTicket;
+    if (!ticket) {
+      setDx((d) => ({
+        ...d,
+        error: "This signing session was already opened. Use Refresh link for a new one-time open.",
+      }));
+      return;
+    }
+    if (!identityReady) {
+      const e: Errors = {};
+      validateIdentityFields(e);
+      setErrors(e);
+      setOpen(1);
+      return;
+    }
+    persistForm();
+    // Burn local ticket before navigation so it cannot be reused from memory.
+    setDx((d) => ({
+      ...d,
+      openTicket: null,
+      hasLink: true,
+      awaitingSign: true,
+      error: null,
+    }));
+
+    // Full-page form POST → BFF 302 to dxFeed (signing URL is not left in XHR JSON).
+    const formEl = document.createElement("form");
+    formEl.method = "POST";
+    formEl.action = "/api/onboarding/dxfeed-agreement/open";
+    formEl.style.display = "none";
+    const fields: Record<string, string> = {
+      orderNumber,
+      email: form.email.trim(),
+      openTicket: ticket,
+    };
+    for (const [name, value] of Object.entries(fields)) {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      formEl.appendChild(input);
+    }
+    document.body.appendChild(formEl);
+    formEl.submit();
+  }
+
   async function resetDxAgreement() {
     if (USE_MOCK_FEED) {
       setDx({
         required: false,
         signed: true,
-        link: null,
+        openTicket: null,
+        hasLink: false,
         busy: false,
         error: null,
         awaitingSign: false,
@@ -368,7 +436,8 @@ export function Wizard({
         detail?: string;
         hint?: string;
         ok?: boolean;
-        agreementLink?: string | null;
+        openTicket?: string;
+        hasLink?: boolean;
         agreementSigned?: boolean;
       };
       if (!res.ok) {
@@ -379,11 +448,13 @@ export function Wizard({
         }));
         return;
       }
-      if (data.agreementLink) {
+      const ticket = typeof data.openTicket === "string" ? data.openTicket : null;
+      if (ticket || data.hasLink) {
         setDx({
           required: true,
           signed: data.agreementSigned === true,
-          link: data.agreementLink,
+          openTicket: ticket,
+          hasLink: true,
           busy: false,
           error: null,
           awaitingSign: data.agreementSigned !== true,
@@ -394,7 +465,8 @@ export function Wizard({
       setDx({
         required: true,
         signed: false,
-        link: null,
+        openTicket: null,
+        hasLink: false,
         busy: false,
         error: null,
         awaitingSign: false,
@@ -405,6 +477,20 @@ export function Wizard({
       setDx((d) => ({ ...d, busy: false, error: "Could not reach the server. Try again." }));
     }
   }
+
+  // Strip dxOpenErr from the URL after showing the message once.
+  useEffect(() => {
+    if (!openFailed) return;
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("dxOpenErr")) {
+        url.searchParams.delete("dxOpenErr");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [openFailed]);
 
   // Restore draft after dxFeed redirect (or refresh). Uses localStorage so a
   // redirect into a new tab still recovers name/email/password.
@@ -473,10 +559,10 @@ export function Wizard({
     };
   }, [orderNumber, returnedFromDxSign, refreshDxAgreement]);
 
-  // Poll until Signed — keep going whenever we have a link or just returned from dxFeed.
+  // Poll until Signed — keep going whenever we await a signature or just returned from dxFeed.
   useEffect(() => {
     if (USE_MOCK_FEED || dx.signed) return;
-    if (!dx.awaitingSign && !dx.link && !returnedFromDxSign) return;
+    if (!dx.awaitingSign && !dx.hasLink && !returnedFromDxSign) return;
 
     const tick = () => {
       if (document.visibilityState === "hidden") return;
@@ -496,7 +582,7 @@ export function Wizard({
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
-  }, [dx.signed, dx.awaitingSign, dx.link, returnedFromDxSign, refreshDxAgreement]);
+  }, [dx.signed, dx.awaitingSign, dx.hasLink, returnedFromDxSign, refreshDxAgreement]);
 
   async function next() {
 
@@ -652,6 +738,11 @@ export function Wizard({
                           After you sign on dxFeed you are redirected back to this
                           page — status updates to Signed automatically.
                         </p>
+                        <p className="mt-1.5 rounded-md border border-[var(--l-line)] bg-[var(--l-paper-2)] px-2.5 py-2 text-[12px] leading-snug text-[var(--l-ink)]">
+                          <span className="font-semibold">One-time open.</span>{" "}
+                          Each &ldquo;Open agreement&rdquo; works once for security.
+                          If you need to open it again, use Refresh link first.
+                        </p>
                       </div>
                       {dx.signed ? (
                         <div className="space-y-2">
@@ -678,17 +769,18 @@ export function Wizard({
                               onClick={() => void startDxAgreement()}
                               className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
                             >
-                              {dx.busy ? "Working…" : dx.link ? "Refresh link" : "Prepare agreement"}
+                              {dx.busy ? "Working…" : dx.openTicket || dx.hasLink ? "Refresh link" : "Prepare agreement"}
                             </button>
-                            {dx.link ? (
+                            {dx.openTicket || dx.hasLink ? (
                               <>
-                                <a
-                                  href={dx.link}
-                                  onClick={() => persistForm()}
-                                  className="rounded-lg bg-[var(--l-ink)] px-3.5 py-2 text-[12.5px] font-semibold text-white"
+                                <button
+                                  type="button"
+                                  disabled={dx.busy || !dx.openTicket}
+                                  onClick={() => void openDxAgreement()}
+                                  className="rounded-lg bg-[var(--l-ink)] px-3.5 py-2 text-[12.5px] font-semibold text-white disabled:opacity-40"
                                 >
-                                  Open agreement
-                                </a>
+                                  {dx.openTicket ? "Open agreement" : "Open used — refresh"}
+                                </button>
                                 <button
                                   type="button"
                                   disabled={dx.busy}
