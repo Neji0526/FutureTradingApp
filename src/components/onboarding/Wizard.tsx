@@ -8,6 +8,7 @@ import { CheckboxField } from "./fields";
 import { STEPS } from "./data";
 import { IconCheck, IconLock } from "./icons";
 import { AccountFields } from "./AccountFields";
+import { KycDocumentFields, type KycDocs } from "./KycDocumentFields";
 import { LegalDocumentModal } from "./LegalDocumentModal";
 import { TERMS_AND_PRIVACY, TRADING_RULES } from "./legal-content";
 import { USE_MOCK_FEED } from "@/lib/constants";
@@ -66,10 +67,13 @@ const HEADINGS = [
     title: "Create your account",
     sub: "Sign the market data agreement first, then set your password and accept the documents.",
   },
-  { title: "Verify your identity", sub: "Complete KYC so we can activate your account securely." },
+  {
+    title: "Verify your identity",
+    sub: "Upload your ID and proof of address so we can activate your account securely.",
+  },
   {
     title: "Fund & start trading",
-    sub: "Pay your membership fee and receive your account credentials.",
+    sub: "Confirm your purchase and launch your Vault account.",
   },
 ];
 
@@ -97,6 +101,7 @@ export function Wizard({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDoc>(null);
   const [dx, setDx] = useState<DxAgreementState>(DX_EMPTY);
+  const [kyc, setKyc] = useState<KycDocs>({ idType: "", addressType: "" });
   const formRef = useRef(form);
   formRef.current = form;
   const restoredRef = useRef(false);
@@ -104,6 +109,22 @@ export function Wizard({
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => (e[k] ? { ...e, [k]: "" } : e));
+  };
+
+  const setKycField = (patch: Partial<KycDocs>) => {
+    setKyc((d) => ({ ...d, ...patch }));
+  };
+
+  const setKycError = (key: string, message: string) => {
+    setErrors((e) => {
+      if (!message) {
+        if (!e[key]) return e;
+        const next = { ...e };
+        delete next[key];
+        return next;
+      }
+      return { ...e, [key]: message };
+    });
   };
 
   const identityReady = Boolean(
@@ -126,8 +147,8 @@ export function Wizard({
     marketData: identityReady && dxOk,
     account: accountComplete,
     documents: form.acceptTerms && form.acceptRisk,
-    identity: accountComplete,
-    address: accountComplete,
+    identity: Boolean(kyc.idType && kyc.idFile),
+    address: Boolean(kyc.addressType && kyc.addressFile),
     payment: true,
     launch: accountComplete,
   };
@@ -166,7 +187,14 @@ export function Wizard({
       if (!form.acceptRisk) e.acceptRisk = "You must confirm the trading rules to continue.";
     }
 
-    if (step === 1 || step === 2) {
+    if (step === 1) {
+      if (!kyc.idType) e.idType = "Select your ID document type.";
+      if (!kyc.idFile) e.idFile = "Upload your identity document.";
+      if (!kyc.addressType) e.addressType = "Select your proof of address type.";
+      if (!kyc.addressFile) e.addressFile = "Upload your proof of address.";
+    }
+
+    if (step === 2) {
       validateAccountFields(e);
     }
 
@@ -178,9 +206,10 @@ export function Wizard({
         else if (e.password || e.confirm || e.ageRange) setOpen(2);
         else setOpen(3);
       } else if (step === 1) {
-        setOpen(1);
+        if (e.idType || e.idFile) setOpen(1);
+        else setOpen(2);
       } else {
-        setOpen(2);
+        setOpen(1);
       }
       return false;
     }
@@ -535,6 +564,10 @@ export function Wizard({
       body.set("country", form.country);
       body.set("acceptTerms", String(form.acceptTerms));
       body.set("acceptRisk", String(form.acceptRisk));
+      body.set("idType", kyc.idType);
+      body.set("addressType", kyc.addressType);
+      if (kyc.idFile) body.set("idFile", kyc.idFile);
+      if (kyc.addressFile) body.set("addressFile", kyc.addressFile);
 
       const res = await fetch("/api/onboarding/complete", {
         method: "POST",
@@ -857,22 +890,32 @@ export function Wizard({
                 index={1}
                 title="Identity Documents"
                 complete={complete.identity}
-                open
-                alwaysOpen
+                open={open === 1}
                 onToggle={() => toggle(1)}
               >
-                <AccountFields form={form} errors={errors} onChange={set} />
+                <KycDocumentFields
+                  section="identity"
+                  docs={kyc}
+                  errors={errors}
+                  onChange={setKycField}
+                  onError={setKycError}
+                />
               </Section>
 
               <Section
                 index={2}
                 title="Proof of Address"
                 complete={complete.address}
-                open
-                alwaysOpen
+                open={open === 2}
                 onToggle={() => toggle(2)}
               >
-                <AccountFields form={form} errors={errors} onChange={set} ageFullWidth />
+                <KycDocumentFields
+                  section="address"
+                  docs={kyc}
+                  errors={errors}
+                  onChange={setKycField}
+                  onError={setKycError}
+                />
               </Section>
             </>
           )}
@@ -916,7 +959,27 @@ export function Wizard({
                 open={open === 2}
                 onToggle={() => toggle(2)}
               >
-                <AccountFields form={form} errors={errors} onChange={set} ageFullWidth showEmailHint />
+                <div className="space-y-4">
+                  <p className="text-[13px] leading-relaxed text-[var(--l-body)]">
+                    Confirm your details, then complete onboarding to create your Vault login.
+                  </p>
+                  <dl className="rounded-xl border border-[var(--l-line)] bg-[var(--l-paper-2)] p-5 space-y-3">
+                    {(
+                      [
+                        ["Name", `${form.firstName} ${form.lastName}`.trim() || "—"],
+                        ["Email", form.email || "—"],
+                        ["Country", form.country || "—"],
+                        ["ID document", kyc.idType || "—"],
+                        ["Proof of address", kyc.addressType || "—"],
+                      ] as const
+                    ).map(([k, v]) => (
+                      <div key={k} className="flex items-center justify-between gap-4">
+                        <dt className="text-[13px] text-[var(--l-body)]">{k}</dt>
+                        <dd className="text-right text-[13px] font-semibold text-[var(--l-ink)]">{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
               </Section>
             </>
           )}
