@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useDxFeedActive } from "./useDxFeedActive";
 import { useFeedStatusStore } from "@/store/feed-status-store";
 
-/** About dialog — shows the dxFeed logo once market-data connection is established. */
+/** About dialog — calm, professional dxFeed credit when feed is connected. */
 export function AboutDxFeedModal({ onClose }: { onClose: () => void }) {
   const active = useDxFeedActive();
   const exchanges = useFeedStatusStore((s) => s.state?.exchanges ?? []);
@@ -24,19 +24,19 @@ export function AboutDxFeedModal({ onClose }: { onClose: () => void }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
       onMouseDown={onClose}
     >
       <div
-        className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
+        className="w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-          <h2 className="text-sm font-semibold">About market data</h2>
+          <h2 className="text-sm font-semibold tracking-tight">About market data</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded px-1.5 text-muted hover:text-foreground"
+            className="rounded-md px-1.5 py-0.5 text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
             aria-label="Close"
           >
             ✕
@@ -45,49 +45,36 @@ export function AboutDxFeedModal({ onClose }: { onClose: () => void }) {
 
         <div className="space-y-4 px-5 py-5">
           <p className="text-[13px] leading-relaxed text-muted">
-            The Vault trading terminal. Live futures quotes and charts use the
-            configured market-data provider.
+            The Vault shows live futures prices from your configured market-data provider.
           </p>
 
           {active ? (
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0a0e17]">
-              <div className="bg-gradient-to-b from-[#f05a28]/20 to-transparent px-5 pb-2 pt-5">
-                <p className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff8f6b]">
-                  Powered by
+            <div className="flex flex-col items-center rounded-xl bg-[#0a0e17] px-6 py-8">
+              <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                Powered by
+              </p>
+              <Image
+                src="/vendors/dxfeed/logo-white-v.png"
+                alt="dxFeed"
+                width={168}
+                height={168}
+                className="h-auto w-[140px] sm:w-[160px]"
+                unoptimized
+              />
+              {exchanges.length > 0 ? (
+                <p className="mt-5 max-w-[240px] text-center text-[11px] leading-relaxed text-white/40">
+                  Entitled: {exchanges.slice(0, 5).join(", ")}
+                  {exchanges.length > 5 ? "…" : ""}
                 </p>
-              </div>
-              <div className="flex flex-col items-center gap-4 px-5 pb-6 pt-2">
-                <Image
-                  src="/vendors/dxfeed/logo-white-v.png"
-                  alt="dxFeed"
-                  width={220}
-                  height={220}
-                  className="h-auto w-[200px] sm:w-[220px]"
-                  unoptimized
-                />
-                <Image
-                  src="/vendors/dxfeed/logo-white-h.png"
-                  alt=""
-                  width={160}
-                  height={40}
-                  className="h-8 w-auto opacity-90"
-                  unoptimized
-                />
-                <p className="max-w-[280px] text-center text-[12px] leading-relaxed text-white/55">
-                  Live CME / futures market data for The Vault
-                  {exchanges.length > 0 ? (
-                    <>
-                      {" "}
-                      · entitled: {exchanges.slice(0, 5).join(", ")}
-                      {exchanges.length > 5 ? "…" : ""}
-                    </>
-                  ) : null}
+              ) : (
+                <p className="mt-5 text-center text-[11px] text-white/40">
+                  Live market data connected
                 </p>
-              </div>
+              )}
             </div>
           ) : (
-            <div className="rounded-xl border border-border bg-surface-2 px-4 py-5 text-center text-[13px] text-muted">
-              dxFeed market data is not connected on this environment.
+            <div className="rounded-xl border border-border bg-surface-2 px-4 py-6 text-center text-[13px] text-muted">
+              dxFeed is not connected on this environment.
             </div>
           )}
         </div>

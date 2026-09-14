@@ -75,7 +75,7 @@ export default function DashboardPage() {
         subtitle="Here's your portfolio at a glance."
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <PoweredByDxFeed variant="badge" size="lg" className="pointer-events-auto" />
+            <PoweredByDxFeed variant="badge" size="md" className="pointer-events-auto" />
             <Link href="/trade">
               <Button>Open trade terminal</Button>
             </Link>
@@ -130,9 +130,9 @@ export default function DashboardPage() {
           <CardHeader
             title="Equity curve"
             subtitle="Last 60 days"
-            action={<PoweredByDxFeed variant="badge" size="md" className="pointer-events-auto" />}
+            action={<PoweredByDxFeed variant="badge" size="sm" className="pointer-events-auto" />}
           />
-          <CardBody className="h-[300px] p-2">
+          <CardBody className="relative h-[300px] p-2">
             <EquityChart data={equityCurve} />
           </CardBody>
         </Card>
