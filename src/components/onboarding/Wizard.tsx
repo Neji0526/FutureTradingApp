@@ -132,6 +132,14 @@ export function Wizard({
     launch: accountComplete,
   };
 
+  /** Continue / Complete stays disabled until every sub-section on this step is done. */
+  const canContinue =
+    step === 0
+      ? complete.marketData && complete.account && complete.documents
+      : step === 1
+        ? complete.identity && complete.address
+        : complete.payment && complete.launch;
+
   function validateIdentityFields(e: Errors) {
     if (form.firstName.trim().length < 2) e.firstName = "Enter your first name.";
     if (form.lastName.trim().length < 2) e.lastName = "Enter your last name.";
@@ -499,7 +507,7 @@ export function Wizard({
   }, [dx.signed, dx.awaitingSign, dx.link, returnedFromDxSign, refreshDxAgreement]);
 
   async function next() {
-
+    if (!canContinue) return;
     if (!validate()) return;
     if (step !== STEPS.length - 1) {
       setStep((s) => s + 1);
@@ -933,7 +941,12 @@ export function Wizard({
           <button
             type="button"
             onClick={() => void next()}
-            disabled={submitting}
+            disabled={!canContinue || submitting}
+            title={
+              !canContinue
+                ? "Complete every section on this step before continuing."
+                : undefined
+            }
             className="l-cta rounded-md px-4 py-1.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting
