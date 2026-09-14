@@ -777,6 +777,11 @@ export function Wizard({
                     </div>
                   </ConsentBox>
                 </div>
+                <SectionNext
+                  enabled={complete.marketData}
+                  label="Next"
+                  onClick={() => setOpen(2)}
+                />
               </Section>
 
               <Section
@@ -792,6 +797,11 @@ export function Wizard({
                   onChange={set}
                   ageFullWidth
                   variant="security"
+                />
+                <SectionNext
+                  enabled={complete.account}
+                  label="Next"
+                  onClick={() => setOpen(3)}
                 />
               </Section>
 
@@ -889,6 +899,12 @@ export function Wizard({
                     />
                   </ConsentBox>
                 </div>
+                <SectionNext
+                  enabled={complete.documents && canContinue}
+                  label="Continue"
+                  onClick={() => void next()}
+                  busy={submitting}
+                />
               </Section>
             </>
           )}
@@ -909,6 +925,11 @@ export function Wizard({
                   onChange={setKycField}
                   onError={setKycError}
                 />
+                <SectionNext
+                  enabled={complete.identity}
+                  label="Next"
+                  onClick={() => setOpen(2)}
+                />
               </Section>
 
               <Section
@@ -924,6 +945,12 @@ export function Wizard({
                   errors={errors}
                   onChange={setKycField}
                   onError={setKycError}
+                />
+                <SectionNext
+                  enabled={complete.address && canContinue}
+                  label="Continue"
+                  onClick={() => void next()}
+                  busy={submitting}
                 />
               </Section>
             </>
@@ -959,6 +986,11 @@ export function Wizard({
                     Your membership fee was taken at checkout. Nothing further is charged here.
                   </p>
                 </div>
+                <SectionNext
+                  enabled={complete.payment}
+                  label="Next"
+                  onClick={() => setOpen(2)}
+                />
               </Section>
 
               <Section
@@ -989,6 +1021,12 @@ export function Wizard({
                     ))}
                   </dl>
                 </div>
+                <SectionNext
+                  enabled={canContinue}
+                  label="Complete onboarding"
+                  onClick={() => void next()}
+                  busy={submitting}
+                />
               </Section>
             </>
           )}
@@ -1053,6 +1091,33 @@ export function Wizard({
           setLegalDoc(null);
         }}
       />
+    </div>
+  );
+}
+
+/** Small-step Next / Continue inside each accordion section. */
+function SectionNext({
+  enabled,
+  label,
+  onClick,
+  busy = false,
+}: {
+  enabled: boolean;
+  label: string;
+  onClick: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <div className="mt-6 flex justify-end border-t border-[var(--l-line)] pt-4">
+      <button
+        type="button"
+        disabled={!enabled || busy}
+        onClick={onClick}
+        title={enabled ? undefined : "Complete this section before continuing."}
+        className="l-cta rounded-md px-4 py-1.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {busy ? "Working…" : label}
+      </button>
     </div>
   );
 }
