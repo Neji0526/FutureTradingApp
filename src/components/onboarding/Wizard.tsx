@@ -672,32 +672,36 @@ export function Wizard({
                       ) : (
                         <div className="space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
+                            {dx.link ? (
+                              <a
+                                href={dx.link}
+                                onClick={() => persistForm()}
+                                className="l-cta rounded-md px-3 py-1.5 text-[11.5px] font-semibold tracking-wide text-white"
+                              >
+                                Open agreement
+                              </a>
+                            ) : null}
                             <button
                               type="button"
                               disabled={dx.busy}
                               onClick={() => void startDxAgreement()}
-                              className="l-cta rounded-md px-3 py-1.5 text-[11.5px] font-semibold tracking-wide disabled:cursor-not-allowed disabled:opacity-40"
+                              className={
+                                dx.link
+                                  ? "rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                                  : "l-cta rounded-md px-3 py-1.5 text-[11.5px] font-semibold tracking-wide disabled:cursor-not-allowed disabled:opacity-40"
+                              }
                             >
                               {dx.busy ? "Working…" : dx.link ? "Refresh link" : "Prepare agreement"}
                             </button>
                             {dx.link ? (
-                              <>
-                                <a
-                                  href={dx.link}
-                                  onClick={() => persistForm()}
-                                  className="rounded-md bg-[var(--l-ink)] px-3 py-1.5 text-[11.5px] font-semibold text-white transition-colors hover:opacity-90"
-                                >
-                                  Open agreement
-                                </a>
-                                <button
-                                  type="button"
-                                  disabled={dx.busy}
-                                  onClick={() => void refreshDxAgreement()}
-                                  className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                                >
-                                  I&rsquo;ve signed — check status
-                                </button>
-                              </>
+                              <button
+                                type="button"
+                                disabled={dx.busy}
+                                onClick={() => void refreshDxAgreement()}
+                                className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                              >
+                                I&rsquo;ve signed — check status
+                              </button>
                             ) : null}
                             <button
                               type="button"
