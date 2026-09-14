@@ -7,6 +7,7 @@ import { Icon, type IconName } from "@/components/icons";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { UserMenu } from "./UserMenu";
 import { ThemeToggle } from "./ThemeToggle";
+import { DxFeedConnectionChip } from "@/components/dxfeed/DxFeedConnectionChip";
 import { cn } from "@/lib/utils";
 
 export function TopNav() {
@@ -38,8 +39,9 @@ export function TopNav() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
           <ConnectionStatus className="hidden sm:flex" />
+          <DxFeedConnectionChip className="hidden md:inline-flex" />
           <ThemeToggle />
           <UserMenu />
         </div>
