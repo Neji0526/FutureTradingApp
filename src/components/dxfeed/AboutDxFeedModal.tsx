@@ -6,10 +6,13 @@ import Image from "next/image";
 import { useDxFeedActive } from "./useDxFeedActive";
 import { useFeedStatusStore } from "@/store/feed-status-store";
 
+const EMPTY_EXCHANGES: string[] = [];
+
 /** About dialog — calm, professional dxFeed credit when feed is connected. */
 export function AboutDxFeedModal({ onClose }: { onClose: () => void }) {
   const active = useDxFeedActive();
-  const exchanges = useFeedStatusStore((s) => s.state?.exchanges ?? []);
+  // Stable fallback — `?? []` in a zustand selector causes React #185 (infinite loop).
+  const exchanges = useFeedStatusStore((s) => s.state?.exchanges) ?? EMPTY_EXCHANGES;
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
