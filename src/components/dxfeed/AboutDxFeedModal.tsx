@@ -28,10 +28,10 @@ export function AboutDxFeedModal({ onClose }: { onClose: () => void }) {
       onMouseDown={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-xl border border-border bg-surface shadow-2xl"
+        className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
           <h2 className="text-sm font-semibold">About market data</h2>
           <button
             type="button"
@@ -43,40 +43,50 @@ export function AboutDxFeedModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="space-y-4 px-4 py-5">
-          <p className="text-xs text-muted">
+        <div className="space-y-4 px-5 py-5">
+          <p className="text-[13px] leading-relaxed text-muted">
             The Vault trading terminal. Live futures quotes and charts use the
             configured market-data provider.
           </p>
 
           {active ? (
-            <div className="rounded-lg border border-border bg-[#0a0e17] px-4 py-5">
-              <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-2">
-                Connected data source
-              </p>
-              <div className="flex justify-center">
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0a0e17]">
+              <div className="bg-gradient-to-b from-[#f05a28]/20 to-transparent px-5 pb-2 pt-5">
+                <p className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff8f6b]">
+                  Powered by
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-4 px-5 pb-6 pt-2">
                 <Image
                   src="/vendors/dxfeed/logo-white-v.png"
                   alt="dxFeed"
-                  width={200}
-                  height={200}
-                  className="h-auto w-[200px]"
+                  width={220}
+                  height={220}
+                  className="h-auto w-[200px] sm:w-[220px]"
                   unoptimized
                 />
+                <Image
+                  src="/vendors/dxfeed/logo-white-h.png"
+                  alt=""
+                  width={160}
+                  height={40}
+                  className="h-8 w-auto opacity-90"
+                  unoptimized
+                />
+                <p className="max-w-[280px] text-center text-[12px] leading-relaxed text-white/55">
+                  Live CME / futures market data for The Vault
+                  {exchanges.length > 0 ? (
+                    <>
+                      {" "}
+                      · entitled: {exchanges.slice(0, 5).join(", ")}
+                      {exchanges.length > 5 ? "…" : ""}
+                    </>
+                  ) : null}
+                </p>
               </div>
-              <p className="mt-4 text-center text-xs text-muted">
-                Powered by dxFeed
-                {exchanges.length > 0 ? (
-                  <>
-                    {" "}
-                    · entitled: {exchanges.slice(0, 6).join(", ")}
-                    {exchanges.length > 6 ? "…" : ""}
-                  </>
-                ) : null}
-              </p>
             </div>
           ) : (
-            <div className="rounded-lg border border-border bg-surface-2 px-4 py-4 text-center text-xs text-muted">
+            <div className="rounded-xl border border-border bg-surface-2 px-4 py-5 text-center text-[13px] text-muted">
               dxFeed market data is not connected on this environment.
             </div>
           )}
