@@ -25,6 +25,7 @@ import { getChartColors } from "@/lib/chart-theme";
 import { getInstrument } from "@/lib/constants";
 import type { Order, OrderType, Side } from "@/lib/types";
 import { formatPrice, formatCurrency, cn } from "@/lib/utils";
+import { PoweredByDxFeed } from "@/components/dxfeed/PoweredByDxFeed";
 
 const RESOLUTIONS = [
   { label: "1m", seconds: 60 },
@@ -1430,7 +1431,8 @@ export function CandleChart({ symbol }: { symbol: string }) {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2">
-          <span className="hidden text-[11px] text-muted-2 sm:block">Click the chart to trade</span>
+          <PoweredByDxFeed compact className="hidden sm:flex" />
+          <span className="hidden text-[11px] text-muted-2 lg:block">Click the chart to trade</span>
           <div className="flex items-center gap-1">
             <ZoomBtn onClick={() => zoom(0.7)} label="Zoom in">+</ZoomBtn>
             <ZoomBtn onClick={() => zoom(1.4)} label="Zoom out">−</ZoomBtn>
@@ -1440,6 +1442,10 @@ export function CandleChart({ symbol }: { symbol: string }) {
       </div>
 
       <div className="relative flex-1">
+        <PoweredByDxFeed
+          compact
+          className="absolute bottom-2 left-2 z-20 rounded bg-surface/80 px-1.5 py-0.5 backdrop-blur-sm sm:hidden"
+        />
         {loading && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-surface-2/50 backdrop-blur-sm">
             <span

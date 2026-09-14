@@ -9,6 +9,7 @@ import { Icon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { ChangePasswordModal } from "@/components/layout/ChangePasswordModal";
 import { ConnectDatabentoModal } from "@/components/layout/ConnectDatabentoModal";
+import { AboutDxFeedModal } from "@/components/dxfeed/AboutDxFeedModal";
 
 export function UserMenu() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export function UserMenu() {
   const [open, setOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   const [dbOpen, setDbOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -97,6 +99,16 @@ export function UserMenu() {
               Change password
             </button>
             <button
+              onClick={() => {
+                setOpen(false);
+                setAboutOpen(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground hover:bg-surface-3"
+            >
+              <Icon name="dashboard" width={16} height={16} className="text-muted" />
+              About
+            </button>
+            <button
               onClick={handleLogout}
               className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-short hover:bg-short/10"
             >
@@ -109,6 +121,7 @@ export function UserMenu() {
 
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
       {dbOpen && <ConnectDatabentoModal onClose={() => setDbOpen(false)} />}
+      {aboutOpen && <AboutDxFeedModal onClose={() => setAboutOpen(false)} />}
     </div>
   );
 }

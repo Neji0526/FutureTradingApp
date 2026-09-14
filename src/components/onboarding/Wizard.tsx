@@ -8,6 +8,7 @@ import { CheckboxField } from "./fields";
 import { STEPS } from "./data";
 import { IconCheck, IconLock } from "./icons";
 import { AccountFields } from "./AccountFields";
+import { KycDocumentFields, type KycDocs } from "./KycDocumentFields";
 import { LegalDocumentModal } from "./LegalDocumentModal";
 import { TERMS_AND_PRIVACY, TRADING_RULES } from "./legal-content";
 import { USE_MOCK_FEED } from "@/lib/constants";
@@ -66,10 +67,13 @@ const HEADINGS = [
     title: "Create your account",
     sub: "Sign the market data agreement first, then set your password and accept the documents.",
   },
-  { title: "Verify your identity", sub: "Complete KYC so we can activate your account securely." },
+  {
+    title: "Verify your identity",
+    sub: "Upload your ID and proof of address so we can activate your account securely.",
+  },
   {
     title: "Fund & start trading",
-    sub: "Pay your membership fee and receive your account credentials.",
+    sub: "Confirm your purchase and launch your Vault account.",
   },
 ];
 
@@ -97,6 +101,7 @@ export function Wizard({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDoc>(null);
   const [dx, setDx] = useState<DxAgreementState>(DX_EMPTY);
+  const [kyc, setKyc] = useState<KycDocs>({ idType: "", addressType: "" });
   const formRef = useRef(form);
   formRef.current = form;
   const restoredRef = useRef(false);
@@ -104,6 +109,22 @@ export function Wizard({
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => (e[k] ? { ...e, [k]: "" } : e));
+  };
+
+  const setKycField = (patch: Partial<KycDocs>) => {
+    setKyc((d) => ({ ...d, ...patch }));
+  };
+
+  const setKycError = (key: string, message: string) => {
+    setErrors((e) => {
+      if (!message) {
+        if (!e[key]) return e;
+        const next = { ...e };
+        delete next[key];
+        return next;
+      }
+      return { ...e, [key]: message };
+    });
   };
 
   const identityReady = Boolean(
@@ -126,11 +147,19 @@ export function Wizard({
     marketData: identityReady && dxOk,
     account: accountComplete,
     documents: form.acceptTerms && form.acceptRisk,
-    identity: accountComplete,
-    address: accountComplete,
+    identity: Boolean(kyc.idType && kyc.idFile),
+    address: Boolean(kyc.addressType && kyc.addressFile),
     payment: true,
     launch: accountComplete,
   };
+
+  /** Continue / Complete stays disabled until every sub-section on this step is done. */
+  const canContinue =
+    step === 0
+      ? complete.marketData && complete.account && complete.documents
+      : step === 1
+        ? complete.identity && complete.address
+        : complete.payment && complete.launch;
 
   function validateIdentityFields(e: Errors) {
     if (form.firstName.trim().length < 2) e.firstName = "Enter your first name.";
@@ -158,7 +187,14 @@ export function Wizard({
       if (!form.acceptRisk) e.acceptRisk = "You must confirm the trading rules to continue.";
     }
 
-    if (step === 1 || step === 2) {
+    if (step === 1) {
+      if (!kyc.idType) e.idType = "Select your ID document type.";
+      if (!kyc.idFile) e.idFile = "Upload your identity document.";
+      if (!kyc.addressType) e.addressType = "Select your proof of address type.";
+      if (!kyc.addressFile) e.addressFile = "Upload your proof of address.";
+    }
+
+    if (step === 2) {
       validateAccountFields(e);
     }
 
@@ -170,9 +206,10 @@ export function Wizard({
         else if (e.password || e.confirm || e.ageRange) setOpen(2);
         else setOpen(3);
       } else if (step === 1) {
-        setOpen(1);
+        if (e.idType || e.idFile) setOpen(1);
+        else setOpen(2);
       } else {
-        setOpen(2);
+        setOpen(1);
       }
       return false;
     }
@@ -498,12 +535,18 @@ export function Wizard({
     };
   }, [dx.signed, dx.awaitingSign, dx.link, returnedFromDxSign, refreshDxAgreement]);
 
-  async function next() {
+  function defaultOpenForStep(s: number): number {
+    // Step 3 (Fund & Trade): land on Launch Platform, not Payment.
+    return s === STEPS.length - 1 ? 2 : 1;
+  }
 
+  async function next() {
+    if (!canContinue) return;
     if (!validate()) return;
     if (step !== STEPS.length - 1) {
-      setStep((s) => s + 1);
-      setOpen(1);
+      const nextStep = step + 1;
+      setStep(nextStep);
+      setOpen(defaultOpenForStep(nextStep));
       return;
     }
 
@@ -527,6 +570,10 @@ export function Wizard({
       body.set("country", form.country);
       body.set("acceptTerms", String(form.acceptTerms));
       body.set("acceptRisk", String(form.acceptRisk));
+      body.set("idType", kyc.idType);
+      body.set("addressType", kyc.addressType);
+      if (kyc.idFile) body.set("idFile", kyc.idFile);
+      if (kyc.addressFile) body.set("addressFile", kyc.addressFile);
 
       const res = await fetch("/api/onboarding/complete", {
         method: "POST",
@@ -554,8 +601,11 @@ export function Wizard({
 
   function back() {
     setErrors({});
-    setStep((s) => Math.max(0, s - 1));
-    setOpen(1);
+    setStep((s) => {
+      const prev = Math.max(0, s - 1);
+      setOpen(defaultOpenForStep(prev));
+      return prev;
+    });
   }
 
   const toggle = (n: number) => {
@@ -598,7 +648,7 @@ export function Wizard({
             setErrors({});
             setSubmitError(null);
             setStep(index);
-            setOpen(1);
+            setOpen(defaultOpenForStep(index));
           }}
         />
       </div>
@@ -663,7 +713,7 @@ export function Wizard({
                               type="button"
                               disabled={dx.busy}
                               onClick={() => void resetDxAgreement()}
-                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                              className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
                             >
                               {dx.busy ? "Working…" : "Reset & re-sign"}
                             </button>
@@ -672,38 +722,42 @@ export function Wizard({
                       ) : (
                         <div className="space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
+                            {dx.link ? (
+                              <a
+                                href={dx.link}
+                                onClick={() => persistForm()}
+                                className="l-cta rounded-md px-3 py-1.5 text-[11.5px] font-semibold tracking-wide text-white"
+                              >
+                                Open agreement
+                              </a>
+                            ) : null}
                             <button
                               type="button"
                               disabled={dx.busy}
                               onClick={() => void startDxAgreement()}
-                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                              className={
+                                dx.link
+                                  ? "rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                                  : "l-cta rounded-md px-3 py-1.5 text-[11.5px] font-semibold tracking-wide disabled:cursor-not-allowed disabled:opacity-40"
+                              }
                             >
                               {dx.busy ? "Working…" : dx.link ? "Refresh link" : "Prepare agreement"}
                             </button>
                             {dx.link ? (
-                              <>
-                                <a
-                                  href={dx.link}
-                                  onClick={() => persistForm()}
-                                  className="rounded-lg bg-[var(--l-ink)] px-3.5 py-2 text-[12.5px] font-semibold text-white"
-                                >
-                                  Open agreement
-                                </a>
-                                <button
-                                  type="button"
-                                  disabled={dx.busy}
-                                  onClick={() => void refreshDxAgreement()}
-                                  className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                                >
-                                  I&rsquo;ve signed — check status
-                                </button>
-                              </>
+                              <button
+                                type="button"
+                                disabled={dx.busy}
+                                onClick={() => void refreshDxAgreement()}
+                                className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                              >
+                                I&rsquo;ve signed — check status
+                              </button>
                             ) : null}
                             <button
                               type="button"
                               disabled={dx.busy}
                               onClick={() => void resetDxAgreement()}
-                              className="rounded-lg border border-[var(--l-line)] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                              className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
                             >
                               {dx.busy ? "Working…" : "Reset & re-sign"}
                             </button>
@@ -723,6 +777,11 @@ export function Wizard({
                     </div>
                   </ConsentBox>
                 </div>
+                <SectionNext
+                  enabled={complete.marketData}
+                  label="Next"
+                  onClick={() => setOpen(2)}
+                />
               </Section>
 
               <Section
@@ -738,6 +797,11 @@ export function Wizard({
                   onChange={set}
                   ageFullWidth
                   variant="security"
+                />
+                <SectionNext
+                  enabled={complete.account}
+                  label="Next"
+                  onClick={() => setOpen(3)}
                 />
               </Section>
 
@@ -835,6 +899,12 @@ export function Wizard({
                     />
                   </ConsentBox>
                 </div>
+                <SectionNext
+                  enabled={complete.documents && canContinue}
+                  label="Continue"
+                  onClick={() => void next()}
+                  busy={submitting}
+                />
               </Section>
             </>
           )}
@@ -845,22 +915,43 @@ export function Wizard({
                 index={1}
                 title="Identity Documents"
                 complete={complete.identity}
-                open
-                alwaysOpen
+                open={open === 1}
                 onToggle={() => toggle(1)}
               >
-                <AccountFields form={form} errors={errors} onChange={set} />
+                <KycDocumentFields
+                  section="identity"
+                  docs={kyc}
+                  errors={errors}
+                  onChange={setKycField}
+                  onError={setKycError}
+                />
+                <SectionNext
+                  enabled={complete.identity}
+                  label="Next"
+                  onClick={() => setOpen(2)}
+                />
               </Section>
 
               <Section
                 index={2}
                 title="Proof of Address"
                 complete={complete.address}
-                open
-                alwaysOpen
+                open={open === 2}
                 onToggle={() => toggle(2)}
               >
-                <AccountFields form={form} errors={errors} onChange={set} ageFullWidth />
+                <KycDocumentFields
+                  section="address"
+                  docs={kyc}
+                  errors={errors}
+                  onChange={setKycField}
+                  onError={setKycError}
+                />
+                <SectionNext
+                  enabled={complete.address && canContinue}
+                  label="Continue"
+                  onClick={() => void next()}
+                  busy={submitting}
+                />
               </Section>
             </>
           )}
@@ -895,6 +986,11 @@ export function Wizard({
                     Your membership fee was taken at checkout. Nothing further is charged here.
                   </p>
                 </div>
+                <SectionNext
+                  enabled={complete.payment}
+                  label="Next"
+                  onClick={() => setOpen(2)}
+                />
               </Section>
 
               <Section
@@ -904,7 +1000,33 @@ export function Wizard({
                 open={open === 2}
                 onToggle={() => toggle(2)}
               >
-                <AccountFields form={form} errors={errors} onChange={set} ageFullWidth showEmailHint />
+                <div className="space-y-4">
+                  <p className="text-[13px] leading-relaxed text-[var(--l-body)]">
+                    Confirm your details, then complete onboarding to create your Vault login.
+                  </p>
+                  <dl className="rounded-xl border border-[var(--l-line)] bg-[var(--l-paper-2)] p-5 space-y-3">
+                    {(
+                      [
+                        ["Name", `${form.firstName} ${form.lastName}`.trim() || "—"],
+                        ["Email", form.email || "—"],
+                        ["Country", form.country || "—"],
+                        ["ID document", kyc.idType || "—"],
+                        ["Proof of address", kyc.addressType || "—"],
+                      ] as const
+                    ).map(([k, v]) => (
+                      <div key={k} className="flex items-center justify-between gap-4">
+                        <dt className="text-[13px] text-[var(--l-body)]">{k}</dt>
+                        <dd className="text-right text-[13px] font-semibold text-[var(--l-ink)]">{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+                <SectionNext
+                  enabled={canContinue}
+                  label="Complete onboarding"
+                  onClick={() => void next()}
+                  busy={submitting}
+                />
               </Section>
             </>
           )}
@@ -921,7 +1043,7 @@ export function Wizard({
             type="button"
             onClick={back}
             disabled={step === 0 || submitting}
-            className="rounded-lg border border-[var(--l-line)] px-5 py-2.5 text-[13.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md border border-[var(--l-line)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Back
           </button>
@@ -929,8 +1051,13 @@ export function Wizard({
           <button
             type="button"
             onClick={() => void next()}
-            disabled={submitting}
-            className="l-cta rounded-lg px-6 py-2.5 text-[13.5px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!canContinue || submitting}
+            title={
+              !canContinue
+                ? "Complete every section on this step before continuing."
+                : undefined
+            }
+            className="l-cta rounded-md px-4 py-1.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting
               ? "Working…"
@@ -964,6 +1091,33 @@ export function Wizard({
           setLegalDoc(null);
         }}
       />
+    </div>
+  );
+}
+
+/** Small-step Next / Continue inside each accordion section. */
+function SectionNext({
+  enabled,
+  label,
+  onClick,
+  busy = false,
+}: {
+  enabled: boolean;
+  label: string;
+  onClick: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <div className="mt-6 flex justify-end border-t border-[var(--l-line)] pt-4">
+      <button
+        type="button"
+        disabled={!enabled || busy}
+        onClick={onClick}
+        title={enabled ? undefined : "Complete this section before continuing."}
+        className="l-cta rounded-md px-4 py-1.5 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {busy ? "Working…" : label}
+      </button>
     </div>
   );
 }

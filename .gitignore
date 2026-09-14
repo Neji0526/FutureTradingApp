@@ -38,6 +38,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# KYC uploads from onboarding (local disk)
+/uploads
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
