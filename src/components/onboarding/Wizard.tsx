@@ -535,12 +535,18 @@ export function Wizard({
     };
   }, [dx.signed, dx.awaitingSign, dx.link, returnedFromDxSign, refreshDxAgreement]);
 
+  function defaultOpenForStep(s: number): number {
+    // Step 3 (Fund & Trade): land on Launch Platform, not Payment.
+    return s === STEPS.length - 1 ? 2 : 1;
+  }
+
   async function next() {
     if (!canContinue) return;
     if (!validate()) return;
     if (step !== STEPS.length - 1) {
-      setStep((s) => s + 1);
-      setOpen(1);
+      const nextStep = step + 1;
+      setStep(nextStep);
+      setOpen(defaultOpenForStep(nextStep));
       return;
     }
 
@@ -595,8 +601,11 @@ export function Wizard({
 
   function back() {
     setErrors({});
-    setStep((s) => Math.max(0, s - 1));
-    setOpen(1);
+    setStep((s) => {
+      const prev = Math.max(0, s - 1);
+      setOpen(defaultOpenForStep(prev));
+      return prev;
+    });
   }
 
   const toggle = (n: number) => {
@@ -639,7 +648,7 @@ export function Wizard({
             setErrors({});
             setSubmitError(null);
             setStep(index);
-            setOpen(1);
+            setOpen(defaultOpenForStep(index));
           }}
         />
       </div>
