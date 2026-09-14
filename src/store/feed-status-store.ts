@@ -28,6 +28,7 @@ export interface FeedMarketRow {
 
 export interface FeedLiveState {
   provider: string;
+  dxfeedConnected?: boolean;
   at: string;
   marketOpen: boolean;
   exchanges: string[];
@@ -44,6 +45,8 @@ interface FeedStatusStore {
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
+/** Multiple chart/about components share one poller — stop only when last consumer leaves. */
+let subscribers = 0;
 
 export const useFeedStatusStore = create<FeedStatusStore>((set, get) => ({
   state: null,
@@ -64,12 +67,16 @@ export const useFeedStatusStore = create<FeedStatusStore>((set, get) => ({
   },
 
   start: () => {
-    if (timer || USE_MOCK_FEED || !API_BASE) return;
+    if (USE_MOCK_FEED || !API_BASE) return;
+    subscribers += 1;
+    if (timer) return;
     void get().poll();
     timer = setInterval(() => void get().poll(), 15_000);
   },
 
   stop: () => {
+    subscribers = Math.max(0, subscribers - 1);
+    if (subscribers > 0) return;
     if (timer) clearInterval(timer);
     timer = null;
   },

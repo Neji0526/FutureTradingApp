@@ -6,6 +6,7 @@ import { CandleChart } from "../CandleChart";
 import { useMarketDataStore } from "@/store/market-data-store";
 import { ConnectDatabentoModal } from "@/components/layout/ConnectDatabentoModal";
 import { Button } from "@/components/ui/Button";
+import { PoweredByDxFeed } from "@/components/dxfeed/PoweredByDxFeed";
 
 /**
  * Renders the TradingView Charting Library widget when it is available in
@@ -90,5 +91,13 @@ export function AdvancedChart({ symbol }: { symbol: string }) {
   }
 
   if (useFallback) return <CandleChart symbol={symbol} />;
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+      <PoweredByDxFeed
+        compact
+        className="pointer-events-none absolute bottom-2 left-2 z-20 rounded bg-black/50 px-1.5 py-0.5"
+      />
+    </div>
+  );
 }
