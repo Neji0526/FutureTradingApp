@@ -41,7 +41,7 @@ export function PoweredByDxFeed({
   return <HeaderLockup size={resolved} dark={dark} className={className} />;
 }
 
-/** Dashboard / card headers — single mark + clear caption, no duplicate logos. */
+/** Dashboard / card headers — mark + Powered by + Connected status. */
 function HeaderLockup({
   size,
   dark,
@@ -64,8 +64,8 @@ function HeaderLockup({
           : "border-black/8 bg-black/[0.03] hover:bg-black/[0.05]",
         className,
       )}
-      title="Market data provided by dxFeed"
-      aria-label="Powered by dxFeed"
+      title="dxFeed market data connected"
+      aria-label="Connected dxFeed — Powered by dxFeed"
     >
       <Image
         src="/vendors/dxfeed/logo-sym.png"
@@ -93,6 +93,10 @@ function HeaderLockup({
         >
           dxFeed
         </p>
+        <p className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-long">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-long" aria-hidden />
+          Connected
+        </p>
       </div>
     </div>
   );
@@ -117,8 +121,8 @@ function OverlayLockup({
       title="Market data provided by dxFeed"
       aria-label="Powered by dxFeed"
     >
-      <p className="text-[8px] font-semibold uppercase tracking-[0.16em] text-white/50">
-        Powered by
+      <p className="text-[8px] font-semibold uppercase tracking-[0.16em] text-long/90">
+        Connected · Powered by
       </p>
       <Image
         src="/vendors/dxfeed/logo-white-h.png"
@@ -160,7 +164,8 @@ function InlineLockup({
         unoptimized
       />
       <p className={cn("text-[11px] leading-snug", dark ? "text-white/55" : "text-muted")}>
-        Powered by{" "}
+        <span className="font-semibold text-long">Connected</span>
+        {" · Powered by "}
         <span className={cn("font-semibold", dark ? "text-white/90" : "text-foreground")}>
           dxFeed
         </span>
