@@ -373,7 +373,7 @@ export function OrderTicket({ symbol }: { symbol: string }) {
         </Button>
       </div>
 
-      <PoweredByDxFeed size="md" className="justify-center pt-1" />
+      <PoweredByDxFeed variant="inline" size="md" className="justify-center pt-2" />
     </form>
   );
 }

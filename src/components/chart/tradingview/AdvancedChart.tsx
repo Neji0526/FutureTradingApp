@@ -95,8 +95,9 @@ export function AdvancedChart({ symbol }: { symbol: string }) {
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
       <PoweredByDxFeed
-        size="md"
-        className="pointer-events-none absolute bottom-2 left-2 z-20 rounded bg-black/50 px-2 py-1"
+        variant="overlay"
+        size="lg"
+        className="absolute bottom-3 left-3 z-20"
       />
     </div>
   );

@@ -1431,7 +1431,7 @@ export function CandleChart({ symbol }: { symbol: string }) {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2">
-          <PoweredByDxFeed size="md" className="hidden sm:flex" />
+          <PoweredByDxFeed variant="inline" size="sm" className="hidden sm:flex" />
           <span className="hidden text-[11px] text-muted-2 lg:block">Click the chart to trade</span>
           <div className="flex items-center gap-1">
             <ZoomBtn onClick={() => zoom(0.7)} label="Zoom in">+</ZoomBtn>
@@ -1443,8 +1443,9 @@ export function CandleChart({ symbol }: { symbol: string }) {
 
       <div className="relative flex-1">
         <PoweredByDxFeed
-          size="md"
-          className="absolute bottom-2 left-2 z-20 rounded bg-surface/80 px-2 py-1 backdrop-blur-sm sm:hidden"
+          variant="overlay"
+          size="lg"
+          className="absolute bottom-3 left-3 z-20"
         />
         {loading && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-surface-2/50 backdrop-blur-sm">
