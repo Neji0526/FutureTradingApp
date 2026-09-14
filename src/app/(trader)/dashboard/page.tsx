@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { PositionsTable } from "@/components/trade/PositionsTable";
 import { OrdersTable } from "@/components/trade/OrdersTable";
 import { EquityChart } from "@/components/chart/EquityChart";
+import { PoweredByDxFeed } from "@/components/dxfeed/PoweredByDxFeed";
 import { seedEquityCurve } from "@/lib/mock/data";
 
 const API_BASE = WS_URL ? WS_URL.replace(/^ws/, "http").replace(/\/ws.*$/, "") : "";
@@ -73,9 +74,12 @@ export default function DashboardPage() {
         title={`Welcome back, ${user?.name.split(" ")[0] ?? "Trader"}`}
         subtitle="Here's your portfolio at a glance."
         actions={
-          <Link href="/trade">
-            <Button>Open trade terminal</Button>
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <PoweredByDxFeed size="lg" className="pointer-events-auto" />
+            <Link href="/trade">
+              <Button>Open trade terminal</Button>
+            </Link>
+          </div>
         }
       />
 
@@ -123,7 +127,11 @@ export default function DashboardPage() {
 
       <div className="mt-4">
         <Card>
-          <CardHeader title="Equity curve" subtitle="Last 60 days" />
+          <CardHeader
+            title="Equity curve"
+            subtitle="Last 60 days"
+            action={<PoweredByDxFeed size="md" className="pointer-events-auto" />}
+          />
           <CardBody className="h-[300px] p-2">
             <EquityChart data={equityCurve} />
           </CardBody>

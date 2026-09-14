@@ -58,9 +58,9 @@ export function AboutDxFeedModal({ onClose }: { onClose: () => void }) {
                 <Image
                   src="/vendors/dxfeed/logo-white-v.png"
                   alt="dxFeed"
-                  width={140}
-                  height={140}
-                  className="h-auto w-[140px]"
+                  width={200}
+                  height={200}
+                  className="h-auto w-[200px]"
                   unoptimized
                 />
               </div>
