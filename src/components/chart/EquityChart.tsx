@@ -12,6 +12,7 @@ import {
 } from "lightweight-charts";
 import { useThemeStore } from "@/store/theme-store";
 import { getChartColors } from "@/lib/chart-theme";
+import { DxFeedChartCredit } from "@/components/dxfeed/DxFeedChartCredit";
 
 /** Compact area chart for the account equity curve. */
 export function EquityChart({ data }: { data: { time: number; value: number }[] }) {
@@ -80,5 +81,10 @@ export function EquityChart({ data }: { data: { time: number; value: number }[] 
     });
   }, [theme]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+      <DxFeedChartCredit className="absolute bottom-2 left-2 z-10" />
+    </div>
+  );
 }

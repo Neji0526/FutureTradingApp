@@ -25,6 +25,7 @@ import { getChartColors } from "@/lib/chart-theme";
 import { getInstrument } from "@/lib/constants";
 import type { Order, OrderType, Side } from "@/lib/types";
 import { formatPrice, formatCurrency, cn } from "@/lib/utils";
+import { DxFeedChartCredit } from "@/components/dxfeed/DxFeedChartCredit";
 
 const RESOLUTIONS = [
   { label: "1m", seconds: 60 },
@@ -1440,6 +1441,7 @@ export function CandleChart({ symbol }: { symbol: string }) {
       </div>
 
       <div className="relative flex-1">
+        <DxFeedChartCredit className="absolute bottom-3 left-3 z-20" />
         {loading && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-surface-2/50 backdrop-blur-sm">
             <span
