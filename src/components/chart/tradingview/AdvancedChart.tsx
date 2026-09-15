@@ -6,7 +6,7 @@ import { CandleChart } from "../CandleChart";
 import { useMarketDataStore } from "@/store/market-data-store";
 import { ConnectDatabentoModal } from "@/components/layout/ConnectDatabentoModal";
 import { Button } from "@/components/ui/Button";
-import { PoweredByDxFeed } from "@/components/dxfeed/PoweredByDxFeed";
+import { DxFeedChartCredit } from "@/components/dxfeed/DxFeedChartCredit";
 
 /**
  * Renders the TradingView Charting Library widget when it is available in
@@ -94,11 +94,7 @@ export function AdvancedChart({ symbol }: { symbol: string }) {
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
-      <PoweredByDxFeed
-        variant="overlay"
-        size="lg"
-        className="absolute bottom-3 left-3 z-20"
-      />
+      <DxFeedChartCredit className="absolute bottom-3 left-3 z-20" />
     </div>
   );
 }

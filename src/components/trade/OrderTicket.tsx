@@ -10,7 +10,6 @@ import type { OrderType, Side, TimeInForce } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select } from "@/components/ui/Field";
 import { formatCurrency, formatPrice, cn } from "@/lib/utils";
-import { PoweredByDxFeed } from "@/components/dxfeed/PoweredByDxFeed";
 
 /** Returned by the backend when the order risk exceeds the per-trade limit. */
 interface Suggestion { symbol: string; quantity: number; risk: number }
@@ -372,8 +371,6 @@ export function OrderTicket({ symbol }: { symbol: string }) {
           Sell {symbol}
         </Button>
       </div>
-
-      <PoweredByDxFeed variant="inline" size="md" className="justify-center pt-2" />
     </form>
   );
 }
