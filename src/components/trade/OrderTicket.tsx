@@ -10,7 +10,7 @@ import type { OrderType, Side, TimeInForce } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select } from "@/components/ui/Field";
 import { formatCurrency, formatPrice, cn } from "@/lib/utils";
-import { DxFeedChartCredit } from "@/components/dxfeed/DxFeedChartCredit";
+import { DxFeedTicketCredit } from "@/components/dxfeed/DxFeedChartCredit";
 
 /** Returned by the backend when the order risk exceeds the per-trade limit. */
 interface Suggestion { symbol: string; quantity: number; risk: number }
@@ -373,7 +373,7 @@ export function OrderTicket({ symbol }: { symbol: string }) {
         </Button>
       </div>
 
-      <DxFeedChartCredit size="lg" className="mx-auto pointer-events-none" />
+      <DxFeedTicketCredit size="lg" className="mt-1" />
     </form>
   );
 }
