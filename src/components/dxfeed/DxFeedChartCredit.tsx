@@ -164,31 +164,27 @@ export function DxFeedTicketCredit({
   return <DxFeedCreditMark className={className} size={size} tone="dark" variant="ticket" />;
 }
 
-/** Onboarding — calm inline attribution for light pages. */
+/** Onboarding — larger “Powered by dxFeed” attribution. */
 export function DxFeedOnboardingCredit({
   className,
-  size = "lg",
 }: {
   className?: string;
   size?: Size;
 }) {
-  const s = SIZE[size];
-
   return (
     <div
-      className={cn(
-        "inline-flex items-center gap-2.5",
-        className,
-      )}
+      className={cn("flex w-fit flex-col items-start gap-2", className)}
       aria-label="Powered by dxFeed"
     >
-      <span className="text-[11px] text-[var(--l-body)]">Live data from</span>
+      <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--l-body)]">
+        Powered by dxFeed
+      </span>
       <Image
         src="/vendors/dxfeed/logo-white-h.png"
         alt="dxFeed"
-        width={s.logoW}
-        height={s.logoHpx}
-        className={cn(s.logoH, "w-auto object-contain object-left opacity-90")}
+        width={220}
+        height={56}
+        className="h-10 w-auto object-contain object-left sm:h-12"
         unoptimized
       />
     </div>
