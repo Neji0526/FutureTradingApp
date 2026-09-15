@@ -15,13 +15,13 @@ export function ScalingLadder({ ctaHref }: { ctaHref: string }) {
     <section id="scaling" className="l-grid relative overflow-hidden py-20 sm:py-28">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <header className="mx-auto max-w-2xl text-center">
-          <h2 className="text-[clamp(1.8rem,4.4vw,2.9rem)] leading-[1.12] font-extrabold tracking-[-0.025em] text-white">
-            One account.{" "}
-            <span className="l-serif font-normal text-[var(--l-blue-300)]">Six rungs to a million.</span>
+          <p className="l-serif text-[15px] text-white/55 sm:text-[16px]">The path to a million</p>
+          <h2 className="mt-2.5 text-[clamp(1.8rem,4.4vw,2.9rem)] leading-[1.12] font-extrabold tracking-[-0.025em] text-white">
+            Scale from $50K to $1,000,000
           </h2>
           <p className="mt-4 text-[14.5px] leading-relaxed text-white/55 sm:text-[15.5px]">
-            Every 10% you make doubles your allocation — automatically, with no application and no
-            negotiation.
+            Our best traders deserve more capital. Hit 10%, get your payout, and receive a bigger
+            account to trade with.
           </p>
         </header>
 
