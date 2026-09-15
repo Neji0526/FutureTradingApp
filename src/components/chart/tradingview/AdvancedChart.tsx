@@ -94,7 +94,7 @@ export function AdvancedChart({ symbol }: { symbol: string }) {
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
-      <DxFeedChartCredit className="absolute bottom-3 left-3 z-20" />
+      <DxFeedChartCredit size="lg" className="absolute bottom-3 left-3 z-20" />
     </div>
   );
 }
