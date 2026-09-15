@@ -8,7 +8,6 @@ import { CheckboxField } from "./fields";
 import { STEPS } from "./data";
 import { IconCheck, IconLock } from "./icons";
 import { AccountFields } from "./AccountFields";
-import { KycDocumentFields, type KycDocs } from "./KycDocumentFields";
 import { LegalDocumentModal } from "./LegalDocumentModal";
 import { TERMS_AND_PRIVACY, TRADING_RULES } from "./legal-content";
 import { USE_MOCK_FEED } from "@/lib/constants";
@@ -66,11 +65,7 @@ const DX_EMPTY: DxAgreementState = {
 const HEADINGS = [
   {
     title: "Create your account",
-    sub: "Sign the market data agreement first, then set your password and accept the documents.",
-  },
-  {
-    title: "Verify your identity",
-    sub: "Upload your ID and proof of address so we can activate your account securely.",
+    sub: "Enter your details, sign the market data agreement, and accept the documents.",
   },
   {
     title: "Fund & start trading",
@@ -79,11 +74,10 @@ const HEADINGS = [
 ];
 
 /**
- * Three-step purchase-gated registration wizard.
+ * Two-step purchase-gated registration wizard.
  *
- * Step 1 — Account Setup: market data agreement first, then account + legal docs
- * Step 2 — Verification: identity + proof of address (profile fields)
- * Step 3 — Fund & Trade: payment confirmation + launch platform
+ * Step 1 — Account Setup: name / email / country / age / password, then market data + legal docs
+ * Step 2 — Fund & Trade: payment confirmation + launch platform
  */
 export function Wizard({
   orderNumber,
@@ -93,8 +87,8 @@ export function Wizard({
   returnedFromDxSign?: boolean;
 }) {
   const [step, setStep] = useState(0);
-  // Section 1 = market data (first). Open it when returning from dxFeed sign.
-  const [open, setOpen] = useState(returnedFromDxSign ? 1 : 1);
+  // Section 1 = account fields. Open market-data (2) when returning from dxFeed sign.
+  const [open, setOpen] = useState(returnedFromDxSign ? 2 : 1);
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [done, setDone] = useState(false);
@@ -102,7 +96,6 @@ export function Wizard({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDoc>(null);
   const [dx, setDx] = useState<DxAgreementState>(DX_EMPTY);
-  const [kyc, setKyc] = useState<KycDocs>({ idType: "", addressType: "" });
   const formRef = useRef(form);
   formRef.current = form;
   const restoredRef = useRef(false);
@@ -110,22 +103,6 @@ export function Wizard({
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => (e[k] ? { ...e, [k]: "" } : e));
-  };
-
-  const setKycField = (patch: Partial<KycDocs>) => {
-    setKyc((d) => ({ ...d, ...patch }));
-  };
-
-  const setKycError = (key: string, message: string) => {
-    setErrors((e) => {
-      if (!message) {
-        if (!e[key]) return e;
-        const next = { ...e };
-        delete next[key];
-        return next;
-      }
-      return { ...e, [key]: message };
-    });
   };
 
   const identityReady = Boolean(
@@ -145,11 +122,9 @@ export function Wizard({
   const dxOk = !dx.required || dx.signed;
 
   const complete: Record<string, boolean> = {
-    marketData: identityReady && dxOk,
     account: accountComplete,
+    marketData: identityReady && dxOk,
     documents: form.acceptTerms && form.acceptRisk,
-    identity: Boolean(kyc.idType && kyc.idFile),
-    address: Boolean(kyc.addressType && kyc.addressFile),
     payment: true,
     launch: accountComplete,
   };
@@ -157,10 +132,8 @@ export function Wizard({
   /** Continue / Complete stays disabled until every sub-section on this step is done. */
   const canContinue =
     step === 0
-      ? complete.marketData && complete.account && complete.documents
-      : step === 1
-        ? complete.identity && complete.address
-        : complete.payment && complete.launch;
+      ? complete.account && complete.marketData && complete.documents
+      : complete.payment && complete.launch;
 
   function validateIdentityFields(e: Errors) {
     if (form.firstName.trim().length < 2) e.firstName = "Enter your first name.";
@@ -189,13 +162,6 @@ export function Wizard({
     }
 
     if (step === 1) {
-      if (!kyc.idType) e.idType = "Select your ID document type.";
-      if (!kyc.idFile) e.idFile = "Upload your identity document.";
-      if (!kyc.addressType) e.addressType = "Select your proof of address type.";
-      if (!kyc.addressFile) e.addressFile = "Upload your proof of address.";
-    }
-
-    if (step === 2) {
       validateAccountFields(e);
     }
 
@@ -203,14 +169,20 @@ export function Wizard({
 
     if (Object.keys(e).length) {
       if (step === 0) {
-        if (e.dxAgreement || e.firstName || e.lastName || e.email || e.country) setOpen(1);
-        else if (e.password || e.confirm || e.ageRange) setOpen(2);
+        if (
+          e.firstName ||
+          e.lastName ||
+          e.email ||
+          e.country ||
+          e.password ||
+          e.confirm ||
+          e.ageRange
+        ) {
+          setOpen(1);
+        } else if (e.dxAgreement) setOpen(2);
         else setOpen(3);
-      } else if (step === 1) {
-        if (e.idType || e.idFile) setOpen(1);
-        else setOpen(2);
       } else {
-        setOpen(1);
+        setOpen(2);
       }
       return false;
     }
@@ -537,7 +509,7 @@ export function Wizard({
   }, [dx.signed, dx.awaitingSign, dx.link, returnedFromDxSign, refreshDxAgreement]);
 
   function defaultOpenForStep(s: number): number {
-    // Step 3 (Fund & Trade): land on Launch Platform, not Payment.
+    // Fund & Trade: land on Launch Platform, not Payment.
     return s === STEPS.length - 1 ? 2 : 1;
   }
 
@@ -571,10 +543,6 @@ export function Wizard({
       body.set("country", form.country);
       body.set("acceptTerms", String(form.acceptTerms));
       body.set("acceptRisk", String(form.acceptRisk));
-      body.set("idType", kyc.idType);
-      body.set("addressType", kyc.addressType);
-      if (kyc.idFile) body.set("idFile", kyc.idFile);
-      if (kyc.addressFile) body.set("addressFile", kyc.addressFile);
 
       const res = await fetch("/api/onboarding/complete", {
         method: "POST",
@@ -668,28 +636,41 @@ export function Wizard({
             <>
               <Section
                 index={1}
-                title="Market data agreement"
-                complete={complete.marketData}
+                title="Account information"
+                complete={complete.account}
                 open={open === 1}
                 onToggle={() => toggle(1)}
+              >
+                <AccountFields
+                  form={form}
+                  errors={errors}
+                  onChange={set}
+                  showEmailHint
+                  ageFullWidth
+                  variant="full"
+                />
+                <SectionNext
+                  enabled={complete.account}
+                  label="Next"
+                  onClick={() => setOpen(2)}
+                />
+              </Section>
+
+              <Section
+                index={2}
+                title="Market data agreement"
+                complete={complete.marketData}
+                open={open === 2}
+                onToggle={() => toggle(2)}
               >
                 <div className="space-y-5">
                   <DxFeedOnboardingCredit className="w-fit" />
                   <p className="text-[12.5px] text-[var(--l-body)]">
-                    Sign the dxFeed / Volumetrica data agreement first. Enter the
-                    details below (email must match your purchase), prepare the
-                    link, sign, then continue with your account password and
-                    documents. After you sign you return here and your answers
-                    are restored automatically.
+                    Sign the dxFeed / Volumetrica data agreement using the account
+                    details above (email must match your purchase). Prepare the
+                    link, sign, then continue. After you sign you return here and
+                    your answers are restored automatically.
                   </p>
-
-                  <AccountFields
-                    form={form}
-                    errors={errors}
-                    onChange={set}
-                    showEmailHint
-                    variant="identity"
-                  />
 
                   <ConsentBox error={errors.dxAgreement || dx.error || undefined}>
                     <div className="space-y-3">
@@ -735,7 +716,12 @@ export function Wizard({
                             ) : null}
                             <button
                               type="button"
-                              disabled={dx.busy}
+                              disabled={dx.busy || !identityReady}
+                              title={
+                                identityReady
+                                  ? undefined
+                                  : "Complete account information first."
+                              }
                               onClick={() => void startDxAgreement()}
                               className={
                                 dx.link
@@ -781,27 +767,6 @@ export function Wizard({
                 </div>
                 <SectionNext
                   enabled={complete.marketData}
-                  label="Next"
-                  onClick={() => setOpen(2)}
-                />
-              </Section>
-
-              <Section
-                index={2}
-                title="Account information"
-                complete={complete.account}
-                open={open === 2}
-                onToggle={() => toggle(2)}
-              >
-                <AccountFields
-                  form={form}
-                  errors={errors}
-                  onChange={set}
-                  ageFullWidth
-                  variant="security"
-                />
-                <SectionNext
-                  enabled={complete.account}
                   label="Next"
                   onClick={() => setOpen(3)}
                 />
@@ -913,53 +878,6 @@ export function Wizard({
 
           {step === 1 && (
             <>
-              <Section
-                index={1}
-                title="Identity Documents"
-                complete={complete.identity}
-                open={open === 1}
-                onToggle={() => toggle(1)}
-              >
-                <KycDocumentFields
-                  section="identity"
-                  docs={kyc}
-                  errors={errors}
-                  onChange={setKycField}
-                  onError={setKycError}
-                />
-                <SectionNext
-                  enabled={complete.identity}
-                  label="Next"
-                  onClick={() => setOpen(2)}
-                />
-              </Section>
-
-              <Section
-                index={2}
-                title="Proof of Address"
-                complete={complete.address}
-                open={open === 2}
-                onToggle={() => toggle(2)}
-              >
-                <KycDocumentFields
-                  section="address"
-                  docs={kyc}
-                  errors={errors}
-                  onChange={setKycField}
-                  onError={setKycError}
-                />
-                <SectionNext
-                  enabled={complete.address && canContinue}
-                  label="Continue"
-                  onClick={() => void next()}
-                  busy={submitting}
-                />
-              </Section>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
               <Section index={1} title="Payment" complete open={open === 1} onToggle={() => toggle(1)}>
                 <div className="rounded-xl border border-[var(--l-line)] bg-[var(--l-paper-2)] p-5">
                   <p className="flex items-center gap-2 text-[12px] font-bold tracking-[0.1em] text-[var(--l-body)] uppercase">
@@ -1012,8 +930,7 @@ export function Wizard({
                         ["Name", `${form.firstName} ${form.lastName}`.trim() || "—"],
                         ["Email", form.email || "—"],
                         ["Country", form.country || "—"],
-                        ["ID document", kyc.idType || "—"],
-                        ["Proof of address", kyc.addressType || "—"],
+                        ["Age", form.ageRange || "—"],
                       ] as const
                     ).map(([k, v]) => (
                       <div key={k} className="flex items-center justify-between gap-4">

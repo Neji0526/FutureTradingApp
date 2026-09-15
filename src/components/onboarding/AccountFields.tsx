@@ -21,16 +21,14 @@ type Props = {
   ageFullWidth?: boolean;
   showEmailHint?: boolean;
   /**
-   * full — all fields (Verification / Launch)
-   * identity — name, email, country (needed before dxFeed Prepare)
-   * security — password + age (rest of account setup after market data)
+   * full — name, email, country, age, password (Account Setup)
+   * identity — name, email, country only
+   * security — password + age only
    */
   variant?: "full" | "identity" | "security";
 };
 
-/**
- * Shared registration fields used across Account Setup, Verification, and Launch Platform.
- */
+/** Shared registration fields for Account Setup. */
 export function AccountFields({
   form,
   errors,
