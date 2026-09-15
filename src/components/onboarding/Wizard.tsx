@@ -140,9 +140,23 @@ export function Wizard({
   const canContinue =
     step === 0
       ? complete.marketData && complete.account && complete.documents
-      : step === 1
-        ? complete.identityDocs && complete.proofOfAddress
-        : complete.payment && complete.launch;
+      : complete.payment && complete.launch;
+
+  /** Verification (step index 1) is skipped — data already collected in Account Setup. */
+  function advanceStep(from: number): number {
+    if (from === 0) return 2;
+    return Math.min(STEPS.length - 1, from + 1);
+  }
+
+  function retreatStep(from: number): number {
+    if (from >= 2) return 0;
+    return Math.max(0, from - 1);
+  }
+
+  function resolveSidebarStep(index: number): number {
+    // Clicking Verification jumps to Fund & Trade.
+    return index === 1 ? 2 : index;
+  }
 
   function validateIdentityFields(e: Errors) {
     if (form.firstName.trim().length < 2) e.firstName = "Enter your first name.";
@@ -170,10 +184,6 @@ export function Wizard({
       if (!form.acceptRisk) e.acceptRisk = "You must confirm the trading rules to continue.";
     }
 
-    if (step === 1) {
-      validateAccountFields(e);
-    }
-
     if (step === 2) {
       validateAccountFields(e);
     }
@@ -185,8 +195,6 @@ export function Wizard({
         if (e.dxAgreement || e.firstName || e.lastName || e.email || e.country) setOpen(1);
         else if (e.password || e.confirm || e.ageRange) setOpen(2);
         else setOpen(3);
-      } else if (step === 1) {
-        setOpen(1);
       } else {
         setOpen(2);
       }
@@ -523,7 +531,7 @@ export function Wizard({
     if (!canContinue) return;
     if (!validate()) return;
     if (step !== STEPS.length - 1) {
-      const nextStep = step + 1;
+      const nextStep = advanceStep(step);
       setStep(nextStep);
       setOpen(defaultOpenForStep(nextStep));
       return;
@@ -577,7 +585,7 @@ export function Wizard({
   function back() {
     setErrors({});
     setStep((s) => {
-      const prev = Math.max(0, s - 1);
+      const prev = retreatStep(s);
       setOpen(defaultOpenForStep(prev));
       return prev;
     });
@@ -619,11 +627,12 @@ export function Wizard({
         <JourneySidebar
           current={step}
           onSelect={(index) => {
-            if (index === step) return;
+            const target = resolveSidebarStep(index);
+            if (target === step) return;
             setErrors({});
             setSubmitError(null);
-            setStep(index);
-            setOpen(defaultOpenForStep(index));
+            setStep(target);
+            setOpen(defaultOpenForStep(target));
           }}
         />
       </div>
