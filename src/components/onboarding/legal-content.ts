@@ -112,7 +112,7 @@ By selecting Accept, you confirm that you have read, understood, and agree to bo
 
 /** Condensed trading rules shown in the onboarding Documents step. */
 export const TRADING_RULES = `
-Last updated: September 10, 2026
+Last updated: September 15, 2026
 
 ══════════════════════════════════════
 TRADING RULES (SUMMARY)
@@ -127,14 +127,17 @@ Phase 1 maximum drawdown: 4% (intraday trailing). Phase 2 maximum drawdown: 3% (
 3. Instruments & sessions
 CME futures only (ES, NQ, YM, CL, GC and micros). Overnight and weekend holds are not permitted — open positions are flattened at session end.
 
-4. Funded accounts
-Once funded, the payout / scaling target is 10% of account size with a minimum of 10 trading days. Contract limits scale with account size.
+4. Manual execution
+Every order must be entered by you. Bots, macros, copy trading, and signal mirroring that place orders for you are not allowed. Alerts and charting tools that do not submit orders are fine.
 
-5. Prohibited practices
-Latency arbitrage, multi-account signal farming, cross-account hedging, and holding under 15 seconds (profits voided) are prohibited. Automated strategies are allowed only if every limit is respected.
+5. Funded accounts
+Once funded, the payout / scaling target is 10% of account size with a minimum of 10 trading days. Contract limits scale with account size. You keep 100% of eligible profits.
 
-6. Enforcement
+6. Prohibited practices
+Latency arbitrage, multi-account signal farming, cross-account hedging, holding under 15 seconds (profits voided), sharing accounts, and exploiting feed or platform errors are prohibited.
+
+7. Enforcement
 Breaching maximum drawdown ends the evaluation. Reaching the daily loss limit ends the session only. We may void profits or close accounts that violate these rules.
 
-Full detail is published on the Rules page. By selecting Accept, you confirm that you have read and agree to trade under these rules.
+Full detail is published on the Trading Rules page (/rules). By selecting Accept, you confirm that you have read and agree to trade under these rules.
 `.trim();

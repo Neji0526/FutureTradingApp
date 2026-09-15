@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { CLICKFUNNELS_CHECKOUT_URL, SESSION_COOKIE } from "@/lib/constants";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { RulesExplorer } from "@/components/rules/RulesExplorer";
+import { RulesConfirmBar } from "@/components/rules/RulesConfirmBar";
 import { IconArrowRight } from "@/components/rules/icons";
 
 const TITLE = "Trading rules — The Vault";
@@ -35,15 +37,15 @@ export default async function RulesPage() {
 
       <LandingNav isAuthed={isAuthed} homeHref={portalHref} purchaseHref={purchaseHref} />
 
-      <main id="main" className="mx-auto max-w-[900px] px-5 py-14 sm:px-8 sm:py-20">
+      <main id="main" className="mx-auto max-w-[900px] px-5 py-14 pb-28 sm:px-8 sm:py-20 sm:pb-28">
         <header className="text-center">
-          <p className="l-serif text-[15px] text-[var(--l-blue-500)]">Transparency first</p>
+          <p className="l-serif text-[15px] text-[var(--l-blue-500)]">Know the limits</p>
           <h1 className="mt-2.5 text-[clamp(1.9rem,6vw,3.1rem)] leading-[1.05] font-extrabold tracking-[-0.01em] text-[var(--l-ink)] uppercase">
             Trading rules
           </h1>
           <p className="mx-auto mt-4 max-w-lg text-[14px] leading-relaxed text-[var(--l-body)] sm:text-[15px]">
-            Everything you need to know before, during, and after your evaluation. Pick a topic to
-            get started.
+            Profit targets, drawdown, daily loss, instruments, execution rules, and what is not
+            allowed — before you trade.
           </p>
         </header>
 
@@ -76,6 +78,10 @@ export default async function RulesPage() {
           © {new Date().getFullYear()} The Vault. All rights reserved.
         </p>
       </footer>
+
+      <Suspense fallback={null}>
+        <RulesConfirmBar />
+      </Suspense>
     </div>
   );
 }
