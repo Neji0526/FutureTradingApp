@@ -284,6 +284,16 @@ export const MOSAIC_RIGHT = [
   "/landing/trader-photo-2.jpeg",
 ];
 
+/** Mobile trader wall — only the six portraits shown in the compact layout. */
+export const MOSAIC_MOBILE = [
+  "/landing/trader-photo-3.jpeg",
+  "/landing/trader-photo-4.jpeg",
+  "/landing/trader-photo-5.jpeg",
+  "/landing/trader-photo-7.jpg",
+  "/landing/trader-photo-8.jpg",
+  "/landing/trader-photo-9.jpg",
+];
+
 /* ------------------------------- Footer ------------------------------- */
 
 export const FOOTER_LINKS: { heading: string; links: { label: string; href: string }[] }[] = [

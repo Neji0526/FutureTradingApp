@@ -57,7 +57,7 @@ export function Hero({ ctaHref, ctaLabel }: { ctaHref: string; ctaLabel: string 
           </Link>
         </div>
 
-        {/* Statue + floating claims. */}
+        {/* Statue + floating claims — statue hidden on mobile (pills only). */}
         <div className="relative mt-8 sm:mt-10">
           <Pill
             label="100% of all profits are yours"
@@ -75,10 +75,10 @@ export function Hero({ ctaHref, ctaLabel }: { ctaHref: string; ctaLabel: string 
             fit="contain"
             priority
             sizes="(max-width: 640px) 88vw, (max-width: 1024px) 60vw, 520px"
-            className="mx-auto h-[300px] w-full max-w-[340px] border-0 bg-transparent sm:h-[420px] sm:max-w-[420px] lg:h-[520px] lg:max-w-[520px]"
+            className="mx-auto hidden h-[420px] w-full max-w-[420px] border-0 bg-transparent md:block lg:h-[520px] lg:max-w-[520px]"
           />
 
-          <div className="mt-6 flex flex-col items-center gap-3 md:hidden">
+          <div className="mt-2 flex flex-col items-center gap-3 md:hidden">
             <Pill label="100% of all profits are yours" />
             <Pill label="Instant automated payouts" />
           </div>
