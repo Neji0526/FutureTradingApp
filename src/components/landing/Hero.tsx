@@ -21,11 +21,9 @@ function Pill({ label, className }: { label: string; className?: string }) {
 
 /**
  * Hero: headline, primary CTA, the statue as centre mark with two floating
- * claims either side, then the three guarantees.
+ * claims either side from `md` up, then the three guarantees.
  *
- * The pills are absolutely positioned from `md` up, matching the design. Below
- * that they stack under the CTA, where there is no room to float them without
- * colliding with the statue.
+ * On mobile the statue stays centered under the CTA (no floating pills).
  */
 export function Hero({ ctaHref, ctaLabel }: { ctaHref: string; ctaLabel: string }) {
   return (
@@ -35,7 +33,7 @@ export function Hero({ ctaHref, ctaLabel }: { ctaHref: string; ctaLabel: string 
         className="pointer-events-none absolute inset-x-0 top-0 h-[560px] bg-[radial-gradient(ellipse_55%_50%_at_50%_0%,rgba(47,111,208,0.08),transparent_70%)]"
       />
 
-      <div className="relative mx-auto max-w-[1180px] px-5 pt-12 pb-16 sm:px-8 sm:pt-16 lg:pt-20">
+      <div className="relative mx-auto max-w-[1180px] px-5 pt-12 pb-10 sm:px-8 sm:pt-16 sm:pb-16 lg:pt-20">
         <h1 className="mx-auto max-w-4xl text-center text-[clamp(1.75rem,7vw,3.9rem)] leading-[1.06] font-extrabold tracking-[-0.03em] text-[var(--l-ink)]">
           Get funded. Keep every dollar
           <span className="l-serif ml-2.5 font-normal">you make.</span>
@@ -57,7 +55,7 @@ export function Hero({ ctaHref, ctaLabel }: { ctaHref: string; ctaLabel: string 
           </Link>
         </div>
 
-        {/* Statue + floating claims — statue hidden on mobile (pills only). */}
+        {/* Statue always visible; floating claims from md up only. */}
         <div className="relative mt-8 sm:mt-10">
           <Pill
             label="100% of all profits are yours"
@@ -74,14 +72,9 @@ export function Hero({ ctaHref, ctaLabel }: { ctaHref: string; ctaLabel: string 
             label="vault-warrior.png"
             fit="contain"
             priority
-            sizes="(max-width: 640px) 88vw, (max-width: 1024px) 60vw, 520px"
-            className="mx-auto hidden h-[420px] w-full max-w-[420px] border-0 bg-transparent md:block lg:h-[520px] lg:max-w-[520px]"
+            sizes="(max-width: 640px) 72vw, (max-width: 1024px) 60vw, 520px"
+            className="mx-auto h-[300px] w-full max-w-[280px] border-0 bg-transparent sm:h-[380px] sm:max-w-[360px] md:h-[420px] md:max-w-[420px] lg:h-[520px] lg:max-w-[520px]"
           />
-
-          <div className="mt-2 flex flex-col items-center gap-3 md:hidden">
-            <Pill label="100% of all profits are yours" />
-            <Pill label="Instant automated payouts" />
-          </div>
         </div>
       </div>
 
