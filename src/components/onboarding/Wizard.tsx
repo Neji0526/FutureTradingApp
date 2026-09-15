@@ -65,7 +65,11 @@ const DX_EMPTY: DxAgreementState = {
 const HEADINGS = [
   {
     title: "Create your account",
-    sub: "Enter your details, sign the market data agreement, and accept the documents.",
+    sub: "Sign the market data agreement first, then set your password and accept the documents.",
+  },
+  {
+    title: "Verify your identity",
+    sub: "Complete KYC so we can activate your account securely.",
   },
   {
     title: "Fund & start trading",
@@ -74,10 +78,11 @@ const HEADINGS = [
 ];
 
 /**
- * Two-step purchase-gated registration wizard.
+ * Three-step purchase-gated registration wizard.
  *
- * Step 1 — Account Setup: name / email / country / age / password, then market data + legal docs
- * Step 2 — Fund & Trade: payment confirmation + launch platform
+ * Step 1 — Account Setup: market data agreement, account + legal docs
+ * Step 2 — Verification: name / email / country / age / password (no file uploads)
+ * Step 3 — Fund & Trade: payment confirmation + launch platform
  */
 export function Wizard({
   orderNumber,
@@ -87,8 +92,8 @@ export function Wizard({
   returnedFromDxSign?: boolean;
 }) {
   const [step, setStep] = useState(0);
-  // Section 1 = account fields. Open market-data (2) when returning from dxFeed sign.
-  const [open, setOpen] = useState(returnedFromDxSign ? 2 : 1);
+  // Section 1 = market data (first). Open it when returning from dxFeed sign.
+  const [open, setOpen] = useState(returnedFromDxSign ? 1 : 1);
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [done, setDone] = useState(false);
@@ -122,9 +127,10 @@ export function Wizard({
   const dxOk = !dx.required || dx.signed;
 
   const complete: Record<string, boolean> = {
-    account: accountComplete,
     marketData: identityReady && dxOk,
+    account: accountComplete,
     documents: form.acceptTerms && form.acceptRisk,
+    identityDocs: accountComplete,
     payment: true,
     launch: accountComplete,
   };
@@ -132,8 +138,10 @@ export function Wizard({
   /** Continue / Complete stays disabled until every sub-section on this step is done. */
   const canContinue =
     step === 0
-      ? complete.account && complete.marketData && complete.documents
-      : complete.payment && complete.launch;
+      ? complete.marketData && complete.account && complete.documents
+      : step === 1
+        ? complete.identityDocs
+        : complete.payment && complete.launch;
 
   function validateIdentityFields(e: Errors) {
     if (form.firstName.trim().length < 2) e.firstName = "Enter your first name.";
@@ -165,22 +173,19 @@ export function Wizard({
       validateAccountFields(e);
     }
 
+    if (step === 2) {
+      validateAccountFields(e);
+    }
+
     setErrors(e);
 
     if (Object.keys(e).length) {
       if (step === 0) {
-        if (
-          e.firstName ||
-          e.lastName ||
-          e.email ||
-          e.country ||
-          e.password ||
-          e.confirm ||
-          e.ageRange
-        ) {
-          setOpen(1);
-        } else if (e.dxAgreement) setOpen(2);
+        if (e.dxAgreement || e.firstName || e.lastName || e.email || e.country) setOpen(1);
+        else if (e.password || e.confirm || e.ageRange) setOpen(2);
         else setOpen(3);
+      } else if (step === 1) {
+        setOpen(1);
       } else {
         setOpen(2);
       }
@@ -636,41 +641,28 @@ export function Wizard({
             <>
               <Section
                 index={1}
-                title="Account information"
-                complete={complete.account}
-                open={open === 1}
-                onToggle={() => toggle(1)}
-              >
-                <AccountFields
-                  form={form}
-                  errors={errors}
-                  onChange={set}
-                  showEmailHint
-                  ageFullWidth
-                  variant="full"
-                />
-                <SectionNext
-                  enabled={complete.account}
-                  label="Next"
-                  onClick={() => setOpen(2)}
-                />
-              </Section>
-
-              <Section
-                index={2}
                 title="Market data agreement"
                 complete={complete.marketData}
-                open={open === 2}
-                onToggle={() => toggle(2)}
+                open={open === 1}
+                onToggle={() => toggle(1)}
               >
                 <div className="space-y-5">
                   <DxFeedOnboardingCredit className="w-fit" />
                   <p className="text-[12.5px] text-[var(--l-body)]">
-                    Sign the dxFeed / Volumetrica data agreement using the account
-                    details above (email must match your purchase). Prepare the
-                    link, sign, then continue. After you sign you return here and
-                    your answers are restored automatically.
+                    Sign the dxFeed / Volumetrica data agreement first. Enter the
+                    details below (email must match your purchase), prepare the
+                    link, sign, then continue with your account password and
+                    documents. After you sign you return here and your answers
+                    are restored automatically.
                   </p>
+
+                  <AccountFields
+                    form={form}
+                    errors={errors}
+                    onChange={set}
+                    showEmailHint
+                    variant="identity"
+                  />
 
                   <ConsentBox error={errors.dxAgreement || dx.error || undefined}>
                     <div className="space-y-3">
@@ -716,12 +708,7 @@ export function Wizard({
                             ) : null}
                             <button
                               type="button"
-                              disabled={dx.busy || !identityReady}
-                              title={
-                                identityReady
-                                  ? undefined
-                                  : "Complete account information first."
-                              }
+                              disabled={dx.busy}
                               onClick={() => void startDxAgreement()}
                               className={
                                 dx.link
@@ -767,6 +754,27 @@ export function Wizard({
                 </div>
                 <SectionNext
                   enabled={complete.marketData}
+                  label="Next"
+                  onClick={() => setOpen(2)}
+                />
+              </Section>
+
+              <Section
+                index={2}
+                title="Account information"
+                complete={complete.account}
+                open={open === 2}
+                onToggle={() => toggle(2)}
+              >
+                <AccountFields
+                  form={form}
+                  errors={errors}
+                  onChange={set}
+                  ageFullWidth
+                  variant="security"
+                />
+                <SectionNext
+                  enabled={complete.account}
                   label="Next"
                   onClick={() => setOpen(3)}
                 />
@@ -877,6 +885,32 @@ export function Wizard({
           )}
 
           {step === 1 && (
+            <>
+              <Section
+                index={1}
+                title="Identity Documents"
+                complete={complete.identityDocs}
+                open={open === 1}
+                onToggle={() => toggle(1)}
+              >
+                <AccountFields
+                  form={form}
+                  errors={errors}
+                  onChange={set}
+                  showEmailHint
+                  variant="full"
+                />
+                <SectionNext
+                  enabled={complete.identityDocs && canContinue}
+                  label="Continue"
+                  onClick={() => void next()}
+                  busy={submitting}
+                />
+              </Section>
+            </>
+          )}
+
+          {step === 2 && (
             <>
               <Section index={1} title="Payment" complete open={open === 1} onToggle={() => toggle(1)}>
                 <div className="rounded-xl border border-[var(--l-line)] bg-[var(--l-paper-2)] p-5">

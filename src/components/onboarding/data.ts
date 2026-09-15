@@ -1,8 +1,9 @@
 import type { StepIcon } from "./icons";
 
-/** Journey steps for purchase-gated registration (no KYC upload step). */
+/** The three journey steps for purchase-gated registration. */
 export const STEPS: { key: string; title: string; icon: StepIcon }[] = [
   { key: "ACCOUNT", title: "Account Setup", icon: "user" },
+  { key: "VERIFICATION", title: "Verification", icon: "shield" },
   { key: "FUNDING", title: "Fund & Trade", icon: "rocket" },
 ];
 
