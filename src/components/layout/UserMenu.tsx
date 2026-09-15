@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { ChangePasswordModal } from "@/components/layout/ChangePasswordModal";
 import { ConnectDatabentoModal } from "@/components/layout/ConnectDatabentoModal";
 import { AboutDxFeedModal } from "@/components/dxfeed/AboutDxFeedModal";
+import { useDxFeedActive } from "@/components/dxfeed/useDxFeedActive";
 
 export function UserMenu() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export function UserMenu() {
   const logout = useAuthStore((s) => s.logout);
   const byo = useMarketDataStore((s) => s.mode === "byo");
   const dbConnected = useMarketDataStore((s) => s.connected);
+  const dxfeedConnected = useDxFeedActive();
   const [open, setOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   const [dbOpen, setDbOpen] = useState(false);
@@ -66,6 +68,12 @@ export function UserMenu() {
             <div className="text-sm font-medium">{user.name}</div>
             <div className="text-xs text-muted">{user.email}</div>
             <div className="mt-1 text-[10px] uppercase tracking-wide text-muted-2">{user.role}</div>
+            {dxfeedConnected ? (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-long/10 px-2 py-1 text-[10px] font-semibold text-long">
+                <span className="h-1.5 w-1.5 rounded-full bg-long" aria-hidden />
+                Connected dxFeed
+              </div>
+            ) : null}
           </div>
           <div className="p-1">
             {user.role === "admin" ? (
