@@ -193,34 +193,79 @@ export const CHALLENGE_PLANS: Plan[] = [
 
 export const FUNDED_PLANS: Plan[] = [
   {
-    phase: "Funded",
+    phase: "Starter",
     size: "$50,000",
     rows: [
-      { label: "Profit target", value: "$5,000 (10%)" },
+      { label: "Profit target", value: "$5,000" },
       { label: "Maximum Drawdown", value: "$2,000" },
-      { label: "Drawdown mode", value: "End of day", hint: true },
-      { label: "Max risk per position", value: "$1,250 (2.5%)", hint: true },
+      { label: "Drawdown mode", value: "EOD trailing", hint: true },
+      { label: "Max risk per position", value: "0.5%", hint: true },
       { label: "Instrument", value: "Futures", hint: true },
-      { label: "Profit split", value: "You keep 100%" },
+      { label: "Resets", value: "Unlimited free resets" },
     ],
-    was: "$0",
-    now: "$0",
-    cadence: "no monthly fee",
+    was: "$199",
+    now: "$97",
+    cadence: "per month",
   },
   {
-    phase: "Funded",
+    phase: "Growth",
     size: "$100,000",
     rows: [
-      { label: "Profit target", value: "$10,000 (10%)" },
+      { label: "Profit target", value: "$10,000" },
       { label: "Maximum Drawdown", value: "$4,000" },
-      { label: "Drawdown mode", value: "End of day", hint: true },
-      { label: "Max risk per position", value: "$2,500 (2.5%)", hint: true },
+      { label: "Drawdown mode", value: "EOD trailing", hint: true },
+      { label: "Max risk per position", value: "0.5%", hint: true },
       { label: "Instrument", value: "Futures", hint: true },
-      { label: "Profit split", value: "You keep 100%" },
+      { label: "Resets", value: "Unlimited free resets" },
     ],
-    was: "$0",
-    now: "$0",
-    cadence: "no monthly fee",
+    was: "$199",
+    now: "$97",
+    cadence: "per month",
+  },
+  {
+    phase: "Professional",
+    size: "$250,000",
+    rows: [
+      { label: "Profit target", value: "$25,000" },
+      { label: "Maximum Drawdown", value: "$10,000" },
+      { label: "Drawdown mode", value: "EOD trailing", hint: true },
+      { label: "Max risk per position", value: "0.5%", hint: true },
+      { label: "Instrument", value: "Futures", hint: true },
+      { label: "Resets", value: "Unlimited free resets" },
+    ],
+    was: "$199",
+    now: "$97",
+    cadence: "per month",
+  },
+  {
+    phase: "Elite",
+    size: "$500,000",
+    rows: [
+      { label: "Profit target", value: "$50,000" },
+      { label: "Maximum Drawdown", value: "$20,000" },
+      { label: "Drawdown mode", value: "EOD trailing", hint: true },
+      { label: "Max risk per position", value: "0.5%", hint: true },
+      { label: "Instrument", value: "Futures", hint: true },
+      { label: "Resets", value: "Unlimited free resets" },
+    ],
+    was: "$199",
+    now: "$97",
+    cadence: "per month",
+  },
+  {
+    phase: "Master",
+    size: "$1,000,000",
+    rows: [
+      { label: "Profit target", value: "$100,000" },
+      { label: "Maximum Drawdown", value: "$40,000" },
+      { label: "Drawdown mode", value: "EOD trailing", hint: true },
+      { label: "Max risk per position", value: "0.5%", hint: true },
+      { label: "Instrument", value: "Futures", hint: true },
+      { label: "Resets", value: "Unlimited free resets" },
+    ],
+    was: "$199",
+    now: "$97",
+    cadence: "per month",
   },
 ];
 
@@ -282,6 +327,16 @@ export const MOSAIC_RIGHT = [
   "/landing/trader-photo-10.jpg",
   "/landing/trader-photo-1.jpeg",
   "/landing/trader-photo-2.jpeg",
+];
+
+/** Mobile trader wall — only the six portraits shown in the compact layout. */
+export const MOSAIC_MOBILE = [
+  "/landing/trader-photo-3.jpeg",
+  "/landing/trader-photo-4.jpeg",
+  "/landing/trader-photo-5.jpeg",
+  "/landing/trader-photo-7.jpg",
+  "/landing/trader-photo-8.jpg",
+  "/landing/trader-photo-9.jpg",
 ];
 
 /* ------------------------------- Footer ------------------------------- */

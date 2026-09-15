@@ -657,26 +657,7 @@ export function Wizard({
                 onToggle={() => toggle(1)}
               >
                 <div className="space-y-6">
-                  <div className="rounded-xl bg-[var(--l-paper-2)] px-4 py-4 sm:px-5">
-                    <DxFeedOnboardingCredit />
-                    <p className="mt-3 text-[13.5px] leading-relaxed text-[var(--l-ink)]">
-                      Before you trade, sign the market-data agreement. It only takes a minute.
-                    </p>
-                    <ol className="mt-3 space-y-1.5 text-[12.5px] leading-relaxed text-[var(--l-body)]">
-                      <li className="flex gap-2">
-                        <span className="font-semibold text-[var(--l-ink)]">1.</span>
-                        Enter the name and email from your purchase.
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="font-semibold text-[var(--l-ink)]">2.</span>
-                        Prepare the agreement, then open and sign it.
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="font-semibold text-[var(--l-ink)]">3.</span>
-                        You&rsquo;ll return here automatically — then continue.
-                      </li>
-                    </ol>
-                  </div>
+                  <DxFeedOnboardingCredit />
 
                   <div>
                     <p className="mb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--l-body)]">
