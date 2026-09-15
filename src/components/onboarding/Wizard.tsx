@@ -12,6 +12,7 @@ import { KycDocumentFields, type KycDocs } from "./KycDocumentFields";
 import { LegalDocumentModal } from "./LegalDocumentModal";
 import { TERMS_AND_PRIVACY, TRADING_RULES } from "./legal-content";
 import { USE_MOCK_FEED } from "@/lib/constants";
+import { DxFeedOnboardingCredit } from "@/components/dxfeed/DxFeedChartCredit";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DX_POLL_MS = 3000;
@@ -673,6 +674,7 @@ export function Wizard({
                 onToggle={() => toggle(1)}
               >
                 <div className="space-y-5">
+                  <DxFeedOnboardingCredit className="w-fit" />
                   <p className="text-[12.5px] text-[var(--l-body)]">
                     Sign the dxFeed / Volumetrica data agreement first. Enter the
                     details below (email must match your purchase), prepare the

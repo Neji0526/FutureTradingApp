@@ -84,7 +84,7 @@ export function EquityChart({ data }: { data: { time: number; value: number }[] 
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
-      <DxFeedChartCredit className="absolute bottom-2 left-2 z-10" />
+      <DxFeedChartCredit size="lg" className="absolute bottom-2 left-2 z-10" />
     </div>
   );
 }
