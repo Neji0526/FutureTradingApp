@@ -1,9 +1,8 @@
 import type { StepIcon } from "./icons";
 
-/** The three journey steps for purchase-gated registration. */
+/** Journey steps for purchase-gated registration (no KYC upload step). */
 export const STEPS: { key: string; title: string; icon: StepIcon }[] = [
   { key: "ACCOUNT", title: "Account Setup", icon: "user" },
-  { key: "VERIFICATION", title: "Verification", icon: "shield" },
   { key: "FUNDING", title: "Fund & Trade", icon: "rocket" },
 ];
 
@@ -70,13 +69,4 @@ export const COUNTRIES: { code: string; name: string }[] = [
   { code: "UA", name: "Ukraine" },
   { code: "VN", name: "Vietnam" },
   { code: "ZA", name: "South Africa" },
-];
-
-export const ID_DOCUMENT_TYPES = ["Passport", "Driving licence", "National ID card"];
-
-export const ADDRESS_PROOF_TYPES = [
-  "Bank statement",
-  "Utility bill",
-  "Council tax bill",
-  "Tenancy agreement",
 ];
