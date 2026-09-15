@@ -131,6 +131,7 @@ export function Wizard({
     account: accountComplete,
     documents: form.acceptTerms && form.acceptRisk,
     identityDocs: accountComplete,
+    proofOfAddress: accountComplete,
     payment: true,
     launch: accountComplete,
   };
@@ -140,7 +141,7 @@ export function Wizard({
     step === 0
       ? complete.marketData && complete.account && complete.documents
       : step === 1
-        ? complete.identityDocs
+        ? complete.identityDocs && complete.proofOfAddress
         : complete.payment && complete.launch;
 
   function validateIdentityFields(e: Errors) {
@@ -901,7 +902,28 @@ export function Wizard({
                   variant="full"
                 />
                 <SectionNext
-                  enabled={complete.identityDocs && canContinue}
+                  enabled={complete.identityDocs}
+                  label="Next"
+                  onClick={() => setOpen(2)}
+                />
+              </Section>
+
+              <Section
+                index={2}
+                title="Proof of Address"
+                complete={complete.proofOfAddress}
+                open={open === 2}
+                onToggle={() => toggle(2)}
+              >
+                <AccountFields
+                  form={form}
+                  errors={errors}
+                  onChange={set}
+                  showEmailHint
+                  variant="full"
+                />
+                <SectionNext
+                  enabled={complete.proofOfAddress && canContinue}
                   label="Continue"
                   onClick={() => void next()}
                   busy={submitting}
