@@ -16,15 +16,15 @@ export function WorldMap() {
           </p>
         </header>
 
-        {/* Full-width map on all breakpoints — no horizontal scroll on mobile. */}
-        <div className="mt-8 flex justify-center sm:mt-12">
+        {/* Keep the full map on mobile — scale to screen width, no horizontal scroll. */}
+        <div className="mt-8 sm:mt-12">
           <Img
             src="/landing/world-map.png"
             alt="World map with funded traders marked in Los Angeles, New York, São Paulo, Frankfurt, Moscow, Dubai, Cape Town and Sydney"
             label="world-map.png"
             fit="contain"
-            sizes="(max-width: 640px) 92vw, (max-width: 1200px) 100vw, 1180px"
-            className="h-auto w-full max-w-[300px] border-0 bg-transparent sm:max-w-none sm:aspect-[1376/768]"
+            sizes="(max-width: 640px) 100vw, (max-width: 1200px) 100vw, 1180px"
+            className="mx-auto aspect-[1376/768] h-auto w-full max-w-full border-0 bg-transparent"
           />
         </div>
       </div>
