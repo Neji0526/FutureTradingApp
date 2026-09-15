@@ -150,17 +150,31 @@ export const GROUPS: Group[] = [
         ],
       },
       {
+        id: "manual-execution",
+        title: "Manual Execution",
+        icon: "monitor",
+        body:
+          "Every order must be entered by you, deliberately, for that order. You personally submit and confirm each open, modify, or close. Tools that only alert or chart are fine — tools that place orders for you are not.",
+        points: [
+          "Allowed: alerts and signals that do not place orders; native stop-loss / take-profit you set yourself; charting and journalling tools.",
+          "Not allowed: bots, scripts, macros, expert advisors, or any system that submits orders without your real-time decision.",
+          "Not allowed: copy trading, mirroring, or signal replication into or out of your account.",
+          "Not allowed: anyone else placing or deciding orders in your account.",
+        ],
+      },
+      {
         id: "prohibited",
         title: "Prohibited Practices",
         icon: "ban",
         body:
-          "The limits above assume you are taking genuine market risk. The following exploit the evaluation rather than pass it, and void the profits they produce.",
+          "These limits assume you take genuine market risk. The following exploit the program rather than pass it, and can void profits or close the account.",
         points: [
-          "Latency arbitrage, or trading against a delayed or erroneous feed.",
-          "Running the same signal across multiple accounts so that one is bound to pass.",
-          "Hedging one account against another, whether yours or held by someone else.",
-          "Holding a position for under 15 seconds — profit is voided, losses stand.",
-          "Automated strategies are permitted, provided they respect every limit.",
+          "Latency arbitrage, or trading that depends on feed errors, pricing anomalies, or platform defects.",
+          "Running the same signal across multiple accounts so one is bound to pass.",
+          "Hedging or coordinating positions across accounts (yours or someone else’s).",
+          "Holding under 15 seconds — profit is voided; losses stand.",
+          "Sharing, selling, or letting someone else trade your account — or trading theirs.",
+          "Using a VPN or similar tools to hide identity or location to evade rules or security checks.",
         ],
       },
     ],
@@ -252,10 +266,10 @@ export const GROUPS: Group[] = [
         title: "Platform, Data & Execution",
         icon: "monitor",
         body:
-          "Trading runs through our own web terminal on a live Databento feed. If the platform or the feed fails during a session, affected trades are reviewed and any rule breach caused by the outage is reversed.",
+          "Trading runs through our web terminal on live market data. If the platform or the feed fails during a session, affected trades are reviewed and any rule breach caused by the outage is reversed.",
         facts: [
           { label: "Platform", value: "Web terminal" },
-          { label: "Market data", value: "Databento, live" },
+          { label: "Market data", value: "Live feed" },
           { label: "Outage breaches", value: "Reviewed and reversed" },
         ],
       },

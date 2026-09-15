@@ -21,11 +21,12 @@ export const metadata: Metadata = {
 export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ order?: string; dxSigned?: string }>;
+  searchParams: Promise<{ order?: string; dxSigned?: string; rulesAccepted?: string }>;
 }) {
-  const { order, dxSigned } = await searchParams;
+  const { order, dxSigned, rulesAccepted } = await searchParams;
   const orderNumber = normalizeOrderNumber(typeof order === "string" ? order : "");
   const returnedFromDxSign = dxSigned === "1" || dxSigned === "true";
+  const returnedFromRules = rulesAccepted === "1" || rulesAccepted === "true";
 
   // Empty / hash-truncated query — don't redirect yet; client may recover from `#3327`.
   if (!orderNumber) {
@@ -73,7 +74,11 @@ export default async function OnboardingPage({
       </header>
 
       <main className="mx-auto max-w-[1100px] px-5 py-10 sm:px-8 sm:py-14">
-        <Wizard orderNumber={orderNumber} returnedFromDxSign={returnedFromDxSign} />
+        <Wizard
+          orderNumber={orderNumber}
+          returnedFromDxSign={returnedFromDxSign}
+          returnedFromRules={returnedFromRules}
+        />
       </main>
     </div>
   );

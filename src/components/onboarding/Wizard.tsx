@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { JourneySidebar } from "./JourneySidebar";
 import { Section } from "./Section";
 import { CheckboxField } from "./fields";
@@ -9,7 +10,7 @@ import { STEPS } from "./data";
 import { IconCheck, IconLock } from "./icons";
 import { AccountFields } from "./AccountFields";
 import { LegalDocumentModal } from "./LegalDocumentModal";
-import { TERMS_AND_PRIVACY, TRADING_RULES } from "./legal-content";
+import { TERMS_AND_PRIVACY } from "./legal-content";
 import { USE_MOCK_FEED } from "@/lib/constants";
 import { DxFeedOnboardingCredit } from "@/components/dxfeed/DxFeedChartCredit";
 
@@ -18,7 +19,7 @@ const DX_POLL_MS = 3000;
 const formStorageKey = (order: string) => `vault-onboarding:${order}`;
 
 type Errors = Record<string, string>;
-type LegalDoc = "agreement" | "rules" | null;
+type LegalDoc = "agreement" | null;
 
 interface Form {
   firstName: string;
@@ -87,13 +88,16 @@ const HEADINGS = [
 export function Wizard({
   orderNumber,
   returnedFromDxSign = false,
+  returnedFromRules = false,
 }: {
   orderNumber: string;
   returnedFromDxSign?: boolean;
+  returnedFromRules?: boolean;
 }) {
+  const router = useRouter();
   const [step, setStep] = useState(0);
-  // Section 1 = market data (first). Open it when returning from dxFeed sign.
-  const [open, setOpen] = useState(returnedFromDxSign ? 1 : 1);
+  // Section 1 = market data (first). Open documents (3) when returning from rules confirm.
+  const [open, setOpen] = useState(returnedFromDxSign ? 1 : returnedFromRules ? 3 : 1);
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [done, setDone] = useState(false);
@@ -451,13 +455,35 @@ export function Wizard({
         ageRange: typeof saved.ageRange === "string" ? saved.ageRange : f.ageRange,
         country: typeof saved.country === "string" ? saved.country : f.country,
         acceptTerms: typeof saved.acceptTerms === "boolean" ? saved.acceptTerms : f.acceptTerms,
-        acceptRisk: typeof saved.acceptRisk === "boolean" ? saved.acceptRisk : f.acceptRisk,
+        acceptRisk: returnedFromRules
+          ? true
+          : typeof saved.acceptRisk === "boolean"
+            ? saved.acceptRisk
+            : f.acceptRisk,
       }));
-      setOpen(1);
+      if (!returnedFromRules) setOpen(1);
     } catch {
       /* ignore */
     }
-  }, [orderNumber, returnedFromDxSign]);
+  }, [orderNumber, returnedFromDxSign, returnedFromRules]);
+
+  // Returning from Trading Rules confirm → check the box and land on Documents.
+  useEffect(() => {
+    if (!returnedFromRules) return;
+    set("acceptRisk", true);
+    setErrors((e) => (e.acceptRisk ? { ...e, acceptRisk: "" } : e));
+    setStep(0);
+    setOpen(3);
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("rulesAccepted")) {
+        url.searchParams.delete("rulesAccepted");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [returnedFromRules]);
 
   useEffect(() => {
     if (!restoredRef.current) return;
@@ -594,6 +620,13 @@ export function Wizard({
   const toggle = (n: number) => {
     setOpen((o) => (o === n ? 0 : n));
   };
+
+  function goToTradingRules() {
+    persistForm();
+    router.push(
+      `/rules?from=onboarding&order=${encodeURIComponent(orderNumber)}`,
+    );
+  }
 
   if (done) {
     return (
@@ -862,7 +895,7 @@ export function Wizard({
                           return;
                         }
                         if (!form.acceptRisk) {
-                          setLegalDoc("rules");
+                          goToTradingRules();
                           return;
                         }
                         set("acceptRisk", true);
@@ -879,11 +912,11 @@ export function Wizard({
                             Click to confirm{" "}
                             <button
                               type="button"
-                              className="font-semibold text-[var(--l-ink)] underline decoration-[var(--l-line)] underline-offset-2 hover:decoration-[var(--l-ink)]"
+                              className="font-semibold text-[var(--l-blue-500)] underline decoration-[var(--l-line)] underline-offset-2 hover:decoration-[var(--l-blue-500)]"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                setLegalDoc("rules");
+                                goToTradingRules();
                               }}
                             >
                               the trading rules
@@ -1071,18 +1104,6 @@ export function Wizard({
         onAccept={() => {
           set("acceptTerms", true);
           setErrors((e) => (e.acceptTerms ? { ...e, acceptTerms: "" } : e));
-          setLegalDoc(null);
-        }}
-      />
-
-      <LegalDocumentModal
-        open={legalDoc === "rules"}
-        title="Trading rules"
-        body={TRADING_RULES}
-        onClose={() => setLegalDoc(null)}
-        onAccept={() => {
-          set("acceptRisk", true);
-          setErrors((e) => (e.acceptRisk ? { ...e, acceptRisk: "" } : e));
           setLegalDoc(null);
         }}
       />
