@@ -70,7 +70,7 @@ const HEADINGS = [
   },
   {
     title: "Verify your identity",
-    sub: "Complete KYC so we can activate your account securely.",
+    sub: "Review your details. These were collected in Account Setup — you can edit them here.",
   },
   {
     title: "Fund & start trading",
@@ -144,22 +144,23 @@ export function Wizard({
   const canContinue =
     step === 0
       ? complete.marketData && complete.account && complete.documents
-      : complete.payment && complete.launch;
+      : step === 1
+        ? accountComplete
+        : complete.payment && complete.launch;
 
-  /** Verification (step index 1) is skipped — data already collected in Account Setup. */
+  /**
+   * Continue from Account Setup auto-passes Verification (details already collected).
+   * Sidebar can still open Verification for review; Continue from there goes to Fund & Trade.
+   */
   function advanceStep(from: number): number {
     if (from === 0) return 2;
     return Math.min(STEPS.length - 1, from + 1);
   }
 
   function retreatStep(from: number): number {
+    // Back from Fund & Trade skips Verification the same way Continue does.
     if (from >= 2) return 0;
     return Math.max(0, from - 1);
-  }
-
-  function resolveSidebarStep(index: number): number {
-    // Clicking Verification jumps to Fund & Trade.
-    return index === 1 ? 2 : index;
   }
 
   function validateIdentityFields(e: Errors) {
@@ -188,7 +189,7 @@ export function Wizard({
       if (!form.acceptRisk) e.acceptRisk = "You must confirm the trading rules to continue.";
     }
 
-    if (step === 2) {
+    if (step === 1 || step === 2) {
       validateAccountFields(e);
     }
 
@@ -199,6 +200,8 @@ export function Wizard({
         if (e.dxAgreement || e.firstName || e.lastName || e.email || e.country) setOpen(1);
         else if (e.password || e.confirm || e.ageRange) setOpen(2);
         else setOpen(3);
+      } else if (step === 1) {
+        setOpen(1);
       } else {
         setOpen(2);
       }
@@ -660,12 +663,11 @@ export function Wizard({
         <JourneySidebar
           current={step}
           onSelect={(index) => {
-            const target = resolveSidebarStep(index);
-            if (target === step) return;
+            if (index === step) return;
             setErrors({});
             setSubmitError(null);
-            setStep(target);
-            setOpen(defaultOpenForStep(target));
+            setStep(index);
+            setOpen(defaultOpenForStep(index));
           }}
         />
       </div>
