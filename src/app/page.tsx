@@ -11,6 +11,7 @@ import { WorldMap } from "@/components/landing/WorldMap";
 import { Certificates } from "@/components/landing/Certificates";
 import { Reviews } from "@/components/landing/Reviews";
 import { TopTraders } from "@/components/landing/TopTraders";
+import { SetsApart } from "@/components/landing/SetsApart";
 import { FiveSteps } from "@/components/landing/FiveSteps";
 import { Pricing } from "@/components/landing/Pricing";
 import { Faq } from "@/components/landing/Faq";
@@ -67,6 +68,7 @@ export default async function Home() {
         <Certificates />
         <Reviews />
         <TopTraders ctaHref={ctaHref} />
+        <SetsApart />
         <FiveSteps ctaHref={ctaHref} />
         <Pricing ctaHref={ctaHref} />
         <Faq />

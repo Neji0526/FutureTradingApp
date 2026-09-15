@@ -16,9 +16,12 @@ export function FiveSteps({ ctaHref }: { ctaHref: string }) {
     <section id="how" className="bg-white py-20 sm:py-28">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
         <header className="mx-auto max-w-2xl text-center">
-          <h2 className="text-[clamp(1.8rem,4.6vw,3rem)] leading-[1.12] font-extrabold tracking-[-0.03em] text-[var(--l-ink)]">
+          <p className="l-serif text-[15px] text-[var(--l-body)] sm:text-[16px]">Your Journey</p>
+          <h2 className="mt-3 text-[clamp(1.8rem,4.6vw,3rem)] leading-[1.12] font-extrabold tracking-[-0.03em] text-[var(--l-ink)]">
             Five Steps. One Funded Account.{" "}
-            <span className="l-serif font-normal">Zero Surprises.</span>
+            <span className="l-serif rounded-sm bg-[var(--l-blue-300)]/35 px-1.5 font-normal">
+              Zero Surprises.
+            </span>
           </h2>
           <p className="mt-4 text-[14.5px] leading-relaxed text-[var(--l-body)] sm:text-[15.5px]">
             We&rsquo;re not just another prop firm — we&rsquo;re building the new standard for
