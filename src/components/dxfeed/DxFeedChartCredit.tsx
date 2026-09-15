@@ -164,7 +164,7 @@ export function DxFeedTicketCredit({
   return <DxFeedCreditMark className={className} size={size} tone="dark" variant="ticket" />;
 }
 
-/** Onboarding — always shows full attribution on light background. */
+/** Onboarding — calm inline attribution for light pages. */
 export function DxFeedOnboardingCredit({
   className,
   size = "lg",
@@ -177,21 +177,18 @@ export function DxFeedOnboardingCredit({
   return (
     <div
       className={cn(
-        "flex w-fit flex-col items-start gap-2 rounded-xl",
-        "border border-[var(--l-line)] bg-white px-4 py-3.5 shadow-sm",
+        "inline-flex items-center gap-2.5",
         className,
       )}
       aria-label="Powered by dxFeed"
     >
-      <span className="text-[10px] font-medium uppercase tracking-[0.24em] text-[var(--l-body)]">
-        Market data powered by
-      </span>
+      <span className="text-[11px] text-[var(--l-body)]">Live data from</span>
       <Image
         src="/vendors/dxfeed/logo-white-h.png"
         alt="dxFeed"
         width={s.logoW}
         height={s.logoHpx}
-        className={cn(s.logoH, "w-auto object-contain object-left")}
+        className={cn(s.logoH, "w-auto object-contain object-left opacity-90")}
         unoptimized
       />
     </div>

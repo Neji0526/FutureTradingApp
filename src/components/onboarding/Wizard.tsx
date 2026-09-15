@@ -647,23 +647,40 @@ export function Wizard({
                 open={open === 1}
                 onToggle={() => toggle(1)}
               >
-                <div className="space-y-5">
-                  <DxFeedOnboardingCredit className="w-fit" />
-                  <p className="text-[12.5px] text-[var(--l-body)]">
-                    Sign the dxFeed / Volumetrica data agreement first. Enter the
-                    details below (email must match your purchase), prepare the
-                    link, sign, then continue with your account password and
-                    documents. After you sign you return here and your answers
-                    are restored automatically.
-                  </p>
+                <div className="space-y-6">
+                  <div className="rounded-xl bg-[var(--l-paper-2)] px-4 py-4 sm:px-5">
+                    <DxFeedOnboardingCredit />
+                    <p className="mt-3 text-[13.5px] leading-relaxed text-[var(--l-ink)]">
+                      Before you trade, sign the market-data agreement. It only takes a minute.
+                    </p>
+                    <ol className="mt-3 space-y-1.5 text-[12.5px] leading-relaxed text-[var(--l-body)]">
+                      <li className="flex gap-2">
+                        <span className="font-semibold text-[var(--l-ink)]">1.</span>
+                        Enter the name and email from your purchase.
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="font-semibold text-[var(--l-ink)]">2.</span>
+                        Prepare the agreement, then open and sign it.
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="font-semibold text-[var(--l-ink)]">3.</span>
+                        You&rsquo;ll return here automatically — then continue.
+                      </li>
+                    </ol>
+                  </div>
 
-                  <AccountFields
-                    form={form}
-                    errors={errors}
-                    onChange={set}
-                    showEmailHint
-                    variant="identity"
-                  />
+                  <div>
+                    <p className="mb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-[var(--l-body)]">
+                      Your details
+                    </p>
+                    <AccountFields
+                      form={form}
+                      errors={errors}
+                      onChange={set}
+                      showEmailHint
+                      variant="identity"
+                    />
+                  </div>
 
                   <ConsentBox error={errors.dxAgreement || dx.error || undefined}>
                     <div className="space-y-3">
@@ -675,72 +692,85 @@ export function Wizard({
                           ) : null}
                         </p>
                         <p className="mt-0.5 text-[12.5px] text-[var(--l-body)]">
-                          After you sign on dxFeed you are redirected back to this
-                          page — status updates to Signed automatically.
+                          {dx.signed
+                            ? "Agreement is signed. You can move on to the next section."
+                            : dx.link
+                              ? "Open the agreement to sign. Status updates when you return."
+                              : "Prepare a signing link with the details above."}
                         </p>
                       </div>
                       {dx.signed ? (
-                        <div className="space-y-2">
-                          <p className="text-[13px] font-semibold text-[var(--l-ink)]">
-                            {dx.required ? "Signed — you can continue." : "Not required on this environment."}
-                          </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--l-red)]/10 px-2.5 py-1 text-[11.5px] font-semibold text-[var(--l-red)]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--l-red)]" aria-hidden />
+                            {dx.required ? "Signed" : "Not required"}
+                          </span>
                           {dx.required ? (
                             <button
                               type="button"
                               disabled={dx.busy}
                               onClick={() => void resetDxAgreement()}
-                              className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                              className="rounded-md px-2.5 py-1 text-[11.5px] font-semibold text-[var(--l-body)] underline-offset-2 hover:underline disabled:opacity-40"
                             >
                               {dx.busy ? "Working…" : "Reset & re-sign"}
                             </button>
                           ) : null}
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-2.5">
                           <div className="flex flex-wrap items-center gap-2">
-                            {dx.link ? (
-                              <a
-                                href={dx.link}
-                                onClick={() => persistForm()}
-                                className="l-cta rounded-md px-3 py-1.5 text-[11.5px] font-semibold tracking-wide text-white"
-                              >
-                                Open agreement
-                              </a>
-                            ) : null}
-                            <button
-                              type="button"
-                              disabled={dx.busy}
-                              onClick={() => void startDxAgreement()}
-                              className={
-                                dx.link
-                                  ? "rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                                  : "l-cta rounded-md px-3 py-1.5 text-[11.5px] font-semibold tracking-wide disabled:cursor-not-allowed disabled:opacity-40"
-                              }
-                            >
-                              {dx.busy ? "Working…" : dx.link ? "Refresh link" : "Prepare agreement"}
-                            </button>
-                            {dx.link ? (
+                            {!dx.link ? (
                               <button
                                 type="button"
                                 disabled={dx.busy}
-                                onClick={() => void refreshDxAgreement()}
-                                className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                                onClick={() => void startDxAgreement()}
+                                className="l-cta rounded-md px-3.5 py-2 text-[12px] font-semibold tracking-wide disabled:cursor-not-allowed disabled:opacity-40"
                               >
-                                I&rsquo;ve signed — check status
+                                {dx.busy ? "Working…" : "Prepare agreement"}
                               </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              disabled={dx.busy}
-                              onClick={() => void resetDxAgreement()}
-                              className="rounded-md border border-[var(--l-line)] bg-white px-3 py-1.5 text-[11.5px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
-                            >
-                              {dx.busy ? "Working…" : "Reset & re-sign"}
-                            </button>
+                            ) : (
+                              <>
+                                <a
+                                  href={dx.link}
+                                  onClick={() => persistForm()}
+                                  className="l-cta rounded-md px-3.5 py-2 text-[12px] font-semibold tracking-wide text-white"
+                                >
+                                  Open &amp; sign
+                                </a>
+                                <button
+                                  type="button"
+                                  disabled={dx.busy}
+                                  onClick={() => void refreshDxAgreement()}
+                                  className="rounded-md border border-[var(--l-line)] bg-white px-3 py-2 text-[12px] font-semibold text-[var(--l-ink)] transition-colors hover:bg-[var(--l-paper-2)] disabled:opacity-40"
+                                >
+                                  I&rsquo;ve signed
+                                </button>
+                              </>
+                            )}
                           </div>
+                          {dx.link ? (
+                            <div className="flex flex-wrap gap-3 text-[11.5px]">
+                              <button
+                                type="button"
+                                disabled={dx.busy}
+                                onClick={() => void startDxAgreement()}
+                                className="font-semibold text-[var(--l-body)] underline-offset-2 hover:underline disabled:opacity-40"
+                              >
+                                Refresh link
+                              </button>
+                              <button
+                                type="button"
+                                disabled={dx.busy}
+                                onClick={() => void resetDxAgreement()}
+                                className="font-semibold text-[var(--l-body)] underline-offset-2 hover:underline disabled:opacity-40"
+                              >
+                                Reset &amp; re-sign
+                              </button>
+                            </div>
+                          ) : null}
                           {dx.awaitingSign ? (
                             <p className="text-[12.5px] text-[var(--l-body)]">
-                              Waiting for your signature on dxFeed… this updates automatically.
+                              Waiting for your signature… this updates automatically.
                             </p>
                           ) : null}
                         </div>
