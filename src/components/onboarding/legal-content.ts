@@ -134,7 +134,7 @@ Every order must be entered by you. Bots, macros, copy trading, and signal mirro
 Once funded, the payout / scaling target is 10% of account size with a minimum of 10 trading days. Contract limits scale with account size. You keep 100% of eligible profits.
 
 6. Prohibited practices
-Latency arbitrage, multi-account signal farming, cross-account hedging, holding under 15 seconds (profits voided), sharing accounts, and exploiting feed or platform errors are prohibited.
+Latency arbitrage, multi-account signal farming, cross-account hedging, holding under 30 seconds (profits voided), sharing accounts, and exploiting feed or platform errors are prohibited.
 
 7. Enforcement
 Breaching maximum drawdown ends the evaluation. Reaching the daily loss limit ends the session only. We may void profits or close accounts that violate these rules.
