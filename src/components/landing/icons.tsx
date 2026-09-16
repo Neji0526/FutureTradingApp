@@ -98,9 +98,73 @@ export function IconDiamond({ className }: P) {
   );
 }
 
+export function IconRefresh({ className }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className ?? base} aria-hidden>
+      <path d="M3.5 12a8.5 8.5 0 0 1 14.2-6.3M20.5 12a8.5 8.5 0 0 1-14.2 6.3" />
+      <path d="M17.5 3.5V7h-3.5M6.5 20.5V17H10" />
+    </svg>
+  );
+}
+
+export function IconPercent({ className }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className ?? base} aria-hidden>
+      <path d="m6 18 12-12" />
+      <circle cx="7.5" cy="7.5" r="2.2" />
+      <circle cx="16.5" cy="16.5" r="2.2" />
+    </svg>
+  );
+}
+
+export function IconScale({ className }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className ?? base} aria-hidden>
+      <path d="M4 19.5h16M7 19.5V9.5M17 19.5V9.5M4.5 9.5h15" />
+      <path d="M9.5 9.5 7 5.5 4.5 9.5M19.5 9.5 17 5.5 14.5 9.5" />
+      <path d="M12 5.5V3.5" />
+    </svg>
+  );
+}
+
+export function IconBolt({ className }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className ?? base} aria-hidden>
+      <path d="M13 2.5 5.5 13.5h6L11 21.5 18.5 10.5h-6L13 2.5Z" />
+    </svg>
+  );
+}
+
+export function IconRules({ className }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className ?? base} aria-hidden>
+      <path d="M4.5 19.5V5.5A1.5 1.5 0 0 1 6 4h9.5L19.5 8v11.5A1.5 1.5 0 0 1 18 21H6a1.5 1.5 0 0 1-1.5-1.5Z" />
+      <path d="M15 4v4.5h4.5M8 12h8M8 15.5h5.5" />
+    </svg>
+  );
+}
+
+export function IconMarkets({ className }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className ?? base} aria-hidden>
+      <path d="M4 18.5V11M9.5 18.5V6.5M15 18.5v-5M20.5 18.5V9" />
+      <path d="m4 10 5.5-5 5.5 4.5 5.5-5.5" />
+    </svg>
+  );
+}
+
 export const STAT_ICONS = {
   users: IconUsers,
   medal: IconMedal,
   clock: IconClock,
   infinity: IconInfinity,
+} as const;
+
+export const APART_ICONS = {
+  refresh: IconRefresh,
+  percent: IconPercent,
+  scale: IconScale,
+  bolt: IconBolt,
+  rules: IconRules,
+  markets: IconMarkets,
 } as const;

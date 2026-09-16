@@ -269,6 +269,47 @@ export const FUNDED_PLANS: Plan[] = [
   },
 ];
 
+/* ------------------------ What sets us apart ------------------------ */
+
+export type ApartIcon = "refresh" | "percent" | "scale" | "bolt" | "rules" | "markets";
+
+export const APART_FEATURES: {
+  icon: ApartIcon;
+  title: string;
+  body: string;
+}[] = [
+  {
+    icon: "refresh",
+    title: "Unlimited challenge resets",
+    body: "Most prop firms profit from selling you resets. We don't. Our model works when you succeed, so we have every reason to keep you in the game. Reset as many times as you need, whenever you need. The only thing standing between you and a funded account is your trading — not your wallet.",
+  },
+  {
+    icon: "percent",
+    title: "100% of all profits are 100% yours.",
+    body: "We don't take a cut — because we scale with you. When you're funded and perform well, we replicate your trades in the background using larger position sizes. You keep 100% of your profits — we earn by scaling your edge. A win-win model built on trust and performance.",
+  },
+  {
+    icon: "scale",
+    title: "Scale up to $1,000,000",
+    body: "Start with a $50K funded account, hit 10% and we automatically double your capital. Keep performing and we'll take you all the way to $250K, $500K and eventually $1,000,000. Every time you hit your 10% target, you can request your payout — then your new, bigger account opens immediately.",
+  },
+  {
+    icon: "bolt",
+    title: "No payout denials — ever",
+    body: "Every payout at The Vault is processed automatically the moment you hit your target. There's no human reviewing your trades, no discretionary decisions, no 'windfall behavior' clause that lets us change our mind. If you followed the rules and hit 10%, the money is yours.",
+  },
+  {
+    icon: "rules",
+    title: "Rules that you'll love",
+    body: "Our rules aren't designed to trip you up — they're designed to make you a better trader. A mandatory stop loss on every trade. A daily loss limit that stops a bad day from becoming a disaster. A consistency rule that rewards steady performance over lucky spikes. Every rule we have exists for a reason, and that reason works in your favor just as much as ours.",
+  },
+  {
+    icon: "markets",
+    title: "One account, every market",
+    body: "ES, NQ, Gold, Crude Oil — trade everything from a single funded account without switching platforms or splitting capital across multiple firms. Your position limits and drawdown rules apply across all instruments combined, so you always know exactly where you stand.",
+  },
+];
+
 /* -------------------------------- FAQ -------------------------------- */
 
 export const FAQ = [
