@@ -85,6 +85,7 @@ export const TRADER_NAV: NavItem[] = [
 ];
 
 export const ADMIN_NAV: NavItem[] = [
+  { href: "/admin", label: "Dashboard", icon: "dashboard" },
   { href: "/admin/traders", label: "Traders", icon: "users" },
   { href: "/admin/accounts", label: "Accounts", icon: "account" },
   { href: "/admin/reviews", label: "Reviews", icon: "bell" },

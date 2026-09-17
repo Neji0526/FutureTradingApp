@@ -27,7 +27,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
         <nav className="flex-1 space-y-1 p-3">
           {ADMIN_NAV.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            const active =
+              item.href === "/admin"
+                ? pathname === "/admin"
+                : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
                 key={item.href}
@@ -52,7 +55,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           {/* Mobile admin nav */}
           <nav className="flex items-center gap-1 overflow-x-auto lg:hidden">
             {ADMIN_NAV.map((item) => {
-              const active = pathname.startsWith(item.href);
+              const active =
+                item.href === "/admin"
+                  ? pathname === "/admin"
+                  : pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link
                   key={item.href}

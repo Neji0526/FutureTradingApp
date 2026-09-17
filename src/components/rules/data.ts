@@ -3,12 +3,9 @@ import type { GroupIcon, TopicIcon } from "./icons";
 /**
  * Rules content.
  *
- * Figures come from `seedRuleTemplates()` in `src/lib/mock/data.ts` — the tiers
- * the rules engine actually provisions — so the published rules and the
- * enforced rules cannot drift apart. Key values: Phase 1 target 3% / drawdown
- * 4%, Phase 2 target 6% / drawdown 3% (tighter), funded target 10% with an
- * end-of-day drawdown floor, daily loss 2% throughout, minimum hold 15s, and a
- * 30%-of-target cap on any single day.
+ * Figures match the Vault Trading Rules doc and seeded RuleTemplate rows.
+ * Live per-account limits come from Rule rows cascaded when dxFeed Admin
+ * syncs Trading Rules via webhook (FutureTradingBackend).
  */
 
 export interface Fact {
@@ -98,9 +95,10 @@ export const GROUPS: Group[] = [
         body:
           "Two phases, both measured against your starting balance. Passing Phase 1 does not relax the rules — Phase 2 asks for more profit against a tighter drawdown. There is no time limit on either phase.",
         facts: [
-          { label: "Phase 1 target", value: "3% of account size" },
-          { label: "Phase 2 target", value: "6% of account size" },
-          { label: "Minimum trading days", value: "5 per phase" },
+          { label: "Phase 1 target", value: "$1,500 (3%) on $50K" },
+          { label: "Phase 2 target", value: "$3,000 (6%) on $50K" },
+          { label: "Minimum winning days", value: "5 per phase" },
+          { label: "Max single-day profit", value: "30% of target" },
           { label: "Time limit", value: "None" },
         ],
       },
@@ -109,17 +107,21 @@ export const GROUPS: Group[] = [
         title: "Drawdown & Risk Limits",
         icon: "alert",
         body:
-          "During an evaluation the drawdown trails your highest equity intraday: it rises with your gains and never falls back. On a funded account it becomes an end-of-day floor, recalculated once at the session close, which gives you room to work inside the day.",
+          "During an evaluation the drawdown trails your highest equity intraday: it rises with your gains and never falls back. On a funded account it becomes an end-of-day floor at 3% of starting balance, recalculated once at the session close.",
         facts: [
-          { label: "Phase 1 drawdown", value: "4% — intraday trailing" },
-          { label: "Phase 2 drawdown", value: "3% — intraday trailing" },
-          { label: "Funded drawdown", value: "4% — end-of-day floor" },
-          { label: "Daily loss limit", value: "2% of account size" },
+          { label: "Phase 1 drawdown", value: "$2,000 — intraday trailing" },
+          { label: "Phase 2 drawdown", value: "$1,500 — intraday trailing" },
+          { label: "Funded drawdown", value: "3% — end-of-day trailing" },
+          { label: "Daily loss (eval $50K)", value: "$1,000" },
+          { label: "Daily loss (funded)", value: "2% of starting balance" },
+          { label: "Max risk / trade (eval)", value: "1% ($500 on $50K)" },
+          { label: "Max risk / trade (funded)", value: "0.5% of starting balance" },
+          { label: "Minimum hold", value: "30 seconds" },
         ],
         points: [
           "A stop-loss is required on every order; orders without one are rejected.",
           "Breaching the maximum drawdown ends the evaluation.",
-          "Reaching the daily loss limit ends the session only — the account survives.",
+          "Reaching the daily loss limit ends the session only — the account survives on evaluation.",
         ],
       },
       {
@@ -129,11 +131,13 @@ export const GROUPS: Group[] = [
         body:
           "CME futures only, priced from a live Databento feed. You may trade the full session, but every position must be closed before it ends — the platform flattens anything still open.",
         facts: [
-          { label: "Equity index", value: "ES · NQ · YM (+ Micros)" },
+          { label: "Equity index", value: "ES · NQ · YM · 6E (+ Micros)" },
           { label: "Energy", value: "CL (+ MCL)" },
           { label: "Metals", value: "GC (+ MGC)" },
+          { label: "Rates", value: "ZB" },
           { label: "Overnight holds", value: "Not permitted" },
           { label: "Weekend holds", value: "Not permitted" },
+          { label: "Session flatten", value: "4:59pm ET" },
         ],
       },
       {
@@ -141,12 +145,13 @@ export const GROUPS: Group[] = [
         title: "Funded Account Rules",
         icon: "wallet",
         body:
-          "Once funded, the target becomes the threshold for a payout and an automatic doubling of your allocation. The rule set is the same one you passed on, with the drawdown switched to an end-of-day floor and higher contract ceilings.",
+          "Once funded, payout triggers when cumulative profit reaches 10% of starting balance, with consistency and qualifying-day requirements. The drawdown switches to an end-of-day floor and contract ceilings scale with the tier.",
         facts: [
-          { label: "Profit target", value: "10% of account size" },
-          { label: "Minimum trading days", value: "10" },
-          { label: "$50K contracts", value: "5" },
-          { label: "$1M contracts", value: "30" },
+          { label: "Payout target", value: "10% of starting balance" },
+          { label: "Qualifying days", value: "15 at ≥ 0.6% of balance" },
+          { label: "Consistency", value: "No day > 20% of total profit" },
+          { label: "$50K contracts", value: "5 minis / 50 micros" },
+          { label: "$1M contracts", value: "30 minis / 300 micros" },
         ],
       },
       {
@@ -169,12 +174,12 @@ export const GROUPS: Group[] = [
         body:
           "These limits assume you take genuine market risk. The following exploit the program rather than pass it, and can void profits or close the account.",
         points: [
+          "News trading inside 2 minutes before / 5 minutes after major releases.",
+          "Overnight holds, weekend holds, martingale and averaging down.",
           "Latency arbitrage, or trading that depends on feed errors, pricing anomalies, or platform defects.",
-          "Running the same signal across multiple accounts so one is bound to pass.",
-          "Hedging or coordinating positions across accounts (yours or someone else’s).",
-          "Holding under 15 seconds — profit is voided; losses stand.",
-          "Sharing, selling, or letting someone else trade your account — or trading theirs.",
-          "Using a VPN or similar tools to hide identity or location to evade rules or security checks.",
+          "Copy trading, mirroring, or coordinating positions across accounts.",
+          "Spoofing, wash trading, or trading on behalf of third parties.",
+          "Sharing, selling, or letting someone else trade your account.",
         ],
       },
     ],
@@ -227,13 +232,14 @@ export const GROUPS: Group[] = [
         body:
           "Limits are enforced by the platform, not reviewed afterwards. Contract ceilings, risk per position and the stop-loss requirement are checked before an order leaves the ticket, so a non-compliant order is rejected rather than filled and unwound later.",
         facts: [
-          { label: "Order limits", value: "Checked pre-trade" },
-          { label: "Drawdown", value: "Evaluated on every tick" },
-          { label: "Single-day cap", value: "30% of profit target" },
+          { label: "Soft block (no breach)", value: "Max risk, size, missing SL, news window" },
+          { label: "Hard breach", value: "Drawdown, daily loss, behavioural rules" },
+          { label: "Single-day cap (eval)", value: "30% of profit target" },
+          { label: "Consistency (funded)", value: "20% of total profit" },
         ],
         points: [
-          "A hard breach — maximum drawdown — ends the evaluation immediately.",
-          "A soft breach — daily loss — flattens positions and ends that session.",
+          "A hard breach ends the account immediately; profits are forfeited.",
+          "Soft blocks reject the order at entry — no breach is recorded.",
           "You are always told which rule was hit and the figure that triggered it.",
         ],
       },
@@ -242,10 +248,10 @@ export const GROUPS: Group[] = [
         title: "Resets, Retries & Subscription",
         icon: "refresh",
         body:
-          "We do not make money from selling you another attempt, so resets are free and unlimited. There is no monthly fee and nothing recurring to cancel.",
+          "We do not make money from selling you another attempt, so resets are free and unlimited while subscribed, with a 48-hour gate between resets. There is no monthly fee and nothing recurring to cancel.",
         facts: [
           { label: "Evaluation fee", value: "One-time" },
-          { label: "Resets", value: "Unlimited, free" },
+          { label: "Resets", value: "Unlimited, free (48h gate)" },
           { label: "Subscription", value: "None" },
         ],
       },

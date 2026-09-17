@@ -25,7 +25,7 @@ export default async function RulesPage() {
   const role = session?.split(":")[1];
 
   const isAuthed = Boolean(session);
-  const portalHref = role === "admin" ? "/admin/traders" : "/dashboard";
+  const portalHref = role === "admin" ? "/admin" : "/dashboard";
   const purchaseHref = CLICKFUNNELS_CHECKOUT_URL || "/#pricing";
   const ctaHref = isAuthed ? portalHref : purchaseHref;
 
