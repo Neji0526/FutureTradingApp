@@ -77,7 +77,7 @@ export function UserMenu() {
           </div>
           <div className="p-1">
             {user.role === "admin" ? (
-              <MenuLink href="/admin/traders" label="Admin CRM" icon="users" />
+              <MenuLink href="/admin" label="Admin CRM" icon="dashboard" />
             ) : (
               <MenuLink href="/account" label="Account settings" icon="account" />
             )}

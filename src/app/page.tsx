@@ -42,7 +42,7 @@ export default async function Home() {
   const role = session?.split(":")[1];
 
   const isAuthed = Boolean(session);
-  const portalHref = role === "admin" ? "/admin/traders" : "/dashboard";
+  const portalHref = role === "admin" ? "/admin" : "/dashboard";
   // Guests buy an evaluation on ClickFunnels; signed-in users go to the portal.
   const purchaseHref = CLICKFUNNELS_CHECKOUT_URL || "/?notice=purchase";
   const ctaHref = isAuthed ? portalHref : purchaseHref;

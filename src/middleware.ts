@@ -22,7 +22,7 @@ export function middleware(req: NextRequest) {
 
   // Already authenticated users shouldn't see the login/register pages.
   if ((pathname === "/login" || pathname === "/register") && session) {
-    const home = session.role === "admin" ? "/admin/traders" : "/dashboard";
+    const home = session.role === "admin" ? "/admin" : "/dashboard";
     return NextResponse.redirect(new URL(home, req.url));
   }
 
@@ -48,6 +48,7 @@ export const config = {
     "/trade/:path*",
     "/orders/:path*",
     "/account/:path*",
+    "/admin",
     "/admin/:path*",
   ],
 };

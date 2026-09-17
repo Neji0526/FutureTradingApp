@@ -34,7 +34,7 @@ function LoginForm() {
       return;
     }
     const next = params.get("next");
-    const home = res.role === "admin" ? "/admin/traders" : "/dashboard";
+    const home = res.role === "admin" ? "/admin" : "/dashboard";
     router.replace(next && !next.startsWith("/login") ? next : home);
   }
 
