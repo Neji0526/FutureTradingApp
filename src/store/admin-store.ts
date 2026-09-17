@@ -240,8 +240,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   getRuleTemplates: async () => {
-    const cached = get().ruleTemplates;
-    if (cached.length) return cached;
     const token = live();
     if (token) {
       const res = await fetch(`${API_BASE}/api/admin/rule-templates`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
@@ -251,23 +249,16 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         return data;
       }
     }
+    const cached = get().ruleTemplates;
+    if (cached.length) return cached;
     const mock = seedRuleTemplates();
     set({ ruleTemplates: mock });
     return mock;
   },
 
-  updateRuleTemplate: async (id, patch) => {
-    const token = live();
-    if (token) {
-      await fetch(`${API_BASE}/api/admin/rule-templates/${id}`, {
-        method: "POST",
-        headers: authHeaders(token),
-        body: JSON.stringify(patch),
-      }).catch(() => {});
-      await get().refresh().catch(() => {});
-      return;
-    }
-    set((s) => ({ ruleTemplates: s.ruleTemplates.map((t) => (t.id === id ? { ...t, ...patch, updatedAt: Date.now() } : t)) }));
+  updateRuleTemplate: async (_id, _patch) => {
+    // Tier templates are dxFeed-owned — CRM must not write them.
+    console.warn("[admin] rule template edits are disabled; change rules in Volumetrica Admin");
   },
 
   getTraderDetail: async (id) => {

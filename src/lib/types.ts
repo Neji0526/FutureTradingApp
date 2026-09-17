@@ -329,6 +329,11 @@ export interface RuleTemplate {
   weekendHoldsProhibited: boolean;
   drawdownType: "INTRADAY" | "EOD"; // INTRADAY = real-time trailing; EOD = floor snapshots at session close
   allowedInstruments: string[]; // empty = all instruments allowed
+  /** 'local' (seed) or 'dxfeed' (synced from Volumetrica). */
+  source?: string;
+  /** Volumetrica Trading Rule Reference when synced. */
+  externalReference?: string | null;
+  syncedAt?: number | null;
   updatedAt: number;
 }
 
