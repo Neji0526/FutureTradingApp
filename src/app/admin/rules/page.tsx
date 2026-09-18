@@ -25,7 +25,7 @@ function money(n: number): string {
 /**
  * Read-only view of evaluation rule templates.
  * Limits are owned by Volumetrica / dxFeed Trading Rules and sync into the DB
- * via webhook — edits are not allowed from this CRM page.
+ * via REST (V2 TradingRule/List every 60s) — edits are not allowed from this CRM page.
  */
 export default function RulesPage() {
   const getRuleTemplates = useAdminStore((s) => s.getRuleTemplates);
@@ -55,7 +55,7 @@ export default function RulesPage() {
     <div>
       <PageHeader
         title="Evaluation Rules"
-        subtitle="Live tier limits from dxFeed / Volumetrica. View only — edit rules in Volumetrica Admin; they sync here automatically."
+        subtitle="Live PRIME tiers from dxFeed / Volumetrica. View only — edit in Volumetrica Admin; Vault syncs automatically."
       />
 
       <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -70,10 +70,12 @@ export default function RulesPage() {
       </div>
 
       <Card className="mb-4 border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted">
-        Change Max DD, Daily DD, Profit Target, Universe, etc. in{" "}
+        Traders use{" "}
+        <code className="text-xs">PRIME_50K_EVAL_PHASE1</code> →{" "}
+        <code className="text-xs">PHASE2</code> →{" "}
+        <code className="text-xs">PRIME_50K_FUND</code>. Edit limits in{" "}
         <span className="font-medium text-foreground">Volumetrica → Trading rules</span>
-        {" "}(e.g. <code className="text-xs">PRIME_50K_EVAL</code>). Webhooks update{" "}
-        <code className="text-xs">RuleTemplate</code> and cascade to every linked trader account.
+        ; REST sync updates <code className="text-xs">RuleTemplate</code> and cascades to linked accounts.
         Enforcement stays on Vault OrderEngine / RiskEngine.
       </Card>
 
