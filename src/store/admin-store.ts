@@ -245,6 +245,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       const res = await fetch(`${API_BASE}/api/admin/rule-templates`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
       if (res?.ok) {
         const data = (await res.json()) as RuleTemplate[];
+        console.log(
+          `[admin] GET rule-templates — count=${data.length}` +
+            (data.length ? ` ids=[${data.map((t) => t.id).join(", ")}]` : " (empty DB / not synced from dxFeed yet)"),
+        );
         set({ ruleTemplates: data });
         return data;
       }
