@@ -8,7 +8,9 @@ import { Card } from "@/components/ui/Card";
 import { Stat } from "@/components/ui/Stat";
 import { cn, formatDateTime } from "@/lib/utils";
 
+
 const PHASE_ORDER = ["Challenge Phase 1", "Challenge Phase 2", "Funded", "dxFeed"];
+
 
 function formatAccountSize(n: number): string {
   if (n >= 1_000_000) return `$${n / 1_000_000}M`;
