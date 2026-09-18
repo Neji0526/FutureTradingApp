@@ -3,9 +3,9 @@ import type { GroupIcon, TopicIcon } from "./icons";
 /**
  * Rules content.
  *
- * Figures match the Vault Trading Rules doc and seeded RuleTemplate rows.
- * Live per-account limits come from Rule rows cascaded when dxFeed Admin
- * syncs Trading Rules via webhook (FutureTradingBackend).
+ * Figures match dxFeed PRIME_50K_* RuleTemplate rows.
+ * Live per-account limits come from Rule rows cascaded when
+ * FutureTradingBackend syncs Volumetrica Trading Rules via REST (V2 List).
  */
 
 export interface Fact {
