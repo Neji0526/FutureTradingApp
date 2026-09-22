@@ -11,7 +11,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Purchase backend is not configured." }, { status: 503 });
   }
 
-  let body: { orderNumber?: string; email?: string };
+  let body: {
+    orderNumber?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+  };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -20,6 +25,8 @@ export async function POST(req: Request) {
 
   const orderNumber = normalizeOrderNumber(String(body.orderNumber ?? ""));
   const email = String(body.email ?? "").trim().toLowerCase();
+  const firstName = String(body.firstName ?? "").trim();
+  const lastName = String(body.lastName ?? "").trim();
 
   if (!isValidOrderNumber(orderNumber)) {
     return NextResponse.json({ error: "Invalid order number." }, { status: 400 });
@@ -29,7 +36,12 @@ export async function POST(req: Request) {
     const upstream = await fetch(`${backend}/api/onboarding/dxfeed-agreement/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ orderNumber, email: email || undefined }),
+      body: JSON.stringify({
+        orderNumber,
+        email: email || undefined,
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
+      }),
     });
     const data = await upstream.json().catch(() => ({}));
     return NextResponse.json(data, {

@@ -240,7 +240,12 @@ export function Wizard({
         const res = await fetch("/api/onboarding/dxfeed-agreement/status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderNumber, email: email || undefined }),
+          body: JSON.stringify({
+            orderNumber,
+            email: email || undefined,
+            firstName: formRef.current.firstName.trim() || undefined,
+            lastName: formRef.current.lastName.trim() || undefined,
+          }),
         });
         const data = (await res.json().catch(() => ({}))) as {
           error?: string;
