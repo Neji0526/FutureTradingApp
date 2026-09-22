@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getAuthToken } from "@/store/auth-store";
 import { WS_URL, USE_MOCK_FEED } from "@/lib/constants";
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
 const API_BASE = WS_URL ? WS_URL.replace(/^ws/, "http").replace(/\/ws.*$/, "") : "";
@@ -31,6 +31,7 @@ async function fetchPlatformAccess(): Promise<PlatformAccess | null> {
   return data;
 }
 
+/** Compact Deepchart download + one-time login (dashboard bottom-right). */
 export function PlatformAccessCard() {
   const [access, setAccess] = useState<PlatformAccess | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,18 +61,17 @@ export function PlatformAccessCard() {
     setLoginBusy(true);
     setError(null);
     try {
-      // Always mint a fresh SSO link — LoginUrl is short-lived.
       const fresh = await fetchPlatformAccess();
       const url = fresh?.loginUrl?.trim();
       if (!url) {
-        setError("One-time login is not available yet. Try again in a moment.");
+        setError("Login link unavailable. Try again shortly.");
         if (fresh) setAccess(fresh);
         return;
       }
       setAccess(fresh);
       window.open(url, "_blank", "noopener,noreferrer");
     } catch {
-      setError("Could not create a one-time login link.");
+      setError("Could not create login link.");
     } finally {
       setLoginBusy(false);
     }
@@ -84,48 +84,37 @@ export function PlatformAccessCard() {
   if (!showCard) return null;
 
   return (
-    <Card className="mt-4 overflow-hidden">
-      <CardHeader
-        title={`${platform} platform`}
-        subtitle="Download the desktop app, then use a one-time link to sign in."
-      />
-      <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 space-y-1">
-          <p className="text-sm text-foreground">
-            Install {platform} on your computer, then open the one-time login to access your license.
-          </p>
-          {access?.username ? (
-            <p className="text-xs text-muted truncate">
-              Platform user · <span className="text-foreground/80">{access.username}</span>
-            </p>
-          ) : null}
+    <Card className="overflow-hidden">
+      <CardBody className="space-y-3 p-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-foreground">{platform}</h3>
+          <p className="mt-0.5 text-xs text-muted">Download app · one-time sign-in</p>
           {access?.connectionServer ? (
-            <p className="text-xs text-muted">
-              dxFeed connection server ·{" "}
-              <span className="font-medium text-foreground/80">{access.connectionServer}</span>
+            <p className="mt-1 text-[11px] text-muted truncate">
+              Server · {access.connectionServer}
             </p>
           ) : null}
-          {error ? <p className="text-xs text-short">{error}</p> : null}
+          {error ? <p className="mt-1 text-[11px] text-short">{error}</p> : null}
           {!loading && access && !access.ready && !error ? (
-            <p className="text-xs text-muted">
-              Platform access will appear here after your market data agreement is complete.
-            </p>
+            <p className="mt-1 text-[11px] text-muted">Available after market data agreement.</p>
           ) : null}
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-2">
           {downloadLink ? (
-            <a href={downloadLink} target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary" disabled={loading}>
-                Download {platform}
+            <a href={downloadLink} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1">
+              <Button variant="secondary" size="sm" className="w-full" disabled={loading}>
+                Download
               </Button>
             </a>
           ) : (
-            <Button variant="secondary" disabled loading={loading}>
-              Download {platform}
+            <Button variant="secondary" size="sm" className="min-w-0 flex-1" disabled loading={loading}>
+              Download
             </Button>
           )}
           <Button
+            size="sm"
+            className="min-w-0 flex-1"
             onClick={() => void openOneTimeLogin()}
             disabled={loading}
             loading={loginBusy}

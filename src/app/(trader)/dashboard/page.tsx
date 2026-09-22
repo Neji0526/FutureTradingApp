@@ -122,8 +122,6 @@ export default function DashboardPage() {
         <Stat label="Profit target" value={`${Math.round(profitPct)}%`} tone="long" hint={summary ? formatCurrency(summary.rule.profitTarget) : ""} />
       </div>
 
-      <PlatformAccessCard />
-
       <div className="mt-4">
         <Card>
           <CardHeader title="Equity curve" subtitle="Last 60 days" />
@@ -138,17 +136,20 @@ export default function DashboardPage() {
           <CardHeader title="Open positions" />
           <PositionsTable />
         </Card>
-        <Card className="overflow-hidden">
-          <CardHeader
-            title="Recent orders"
-            action={
-              <Link href="/orders" className="text-xs text-primary hover:underline">
-                View all
-              </Link>
-            }
-          />
-          <OrdersTable orders={orders} limit={6} />
-        </Card>
+        <div className="flex flex-col gap-4">
+          <Card className="overflow-hidden">
+            <CardHeader
+              title="Recent orders"
+              action={
+                <Link href="/orders" className="text-xs text-primary hover:underline">
+                  View all
+                </Link>
+              }
+            />
+            <OrdersTable orders={orders} limit={6} />
+          </Card>
+          <PlatformAccessCard />
+        </div>
       </div>
     </div>
   );
