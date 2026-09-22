@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { PositionsTable } from "@/components/trade/PositionsTable";
 import { OrdersTable } from "@/components/trade/OrdersTable";
 import { EquityChart } from "@/components/chart/EquityChart";
+import { PlatformAccessCard } from "@/components/dashboard/PlatformAccessCard";
 import { seedEquityCurve } from "@/lib/mock/data";
 
 const API_BASE = WS_URL ? WS_URL.replace(/^ws/, "http").replace(/\/ws.*$/, "") : "";
@@ -120,6 +121,8 @@ export default function DashboardPage() {
         />
         <Stat label="Profit target" value={`${Math.round(profitPct)}%`} tone="long" hint={summary ? formatCurrency(summary.rule.profitTarget) : ""} />
       </div>
+
+      <PlatformAccessCard />
 
       <div className="mt-4">
         <Card>
