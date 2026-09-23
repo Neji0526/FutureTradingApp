@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { JourneySidebar } from "./JourneySidebar";
 import { Section } from "./Section";
@@ -638,24 +637,23 @@ export function Wizard({
 
   if (done) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--l-red)] p-4 text-white">
-          <IconCheck />
+      <div className="mx-auto flex min-h-[min(70vh,560px)] max-w-md flex-col items-center justify-center px-2 py-16 text-center">
+        <span
+          className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-[var(--l-red)]/10 text-[var(--l-red)]"
+          aria-hidden
+        >
+          <IconCheck className="h-8 w-8" />
         </span>
-        <h1 className="mt-6 text-[clamp(1.6rem,4vw,2.2rem)] font-extrabold tracking-[-0.02em] text-[var(--l-ink)]">
+        <h1 className="mt-7 text-[clamp(1.75rem,4vw,2.25rem)] font-extrabold tracking-[-0.02em] text-[var(--l-ink)]">
           You&rsquo;re all set
         </h1>
-        <p className="mt-3 text-[14.5px] leading-relaxed text-[var(--l-body)]">
-          Order <span className="nums font-semibold text-[var(--l-ink)]">{orderNumber}</span> has been
-          redeemed. Sign in with{" "}
-          <span className="font-semibold text-[var(--l-ink)]">{form.email}</span>.
+        <p className="mt-4 text-[15px] leading-[1.65] text-[var(--l-body)]">
+          Your onboarding is complete. Your account will be ready shortly, and you&rsquo;ll receive
+          a confirmation email with your login credentials within the next few minutes.
         </p>
-        <Link
-          href="/login"
-          className="l-cta mt-8 inline-block rounded-xl px-7 py-3.5 text-[14px] font-bold"
-        >
-          Go to sign in
-        </Link>
+        <p className="mt-4 text-[13.5px] text-[var(--l-body)]/80">
+          Please also check your spam folder.
+        </p>
       </div>
     );
   }
