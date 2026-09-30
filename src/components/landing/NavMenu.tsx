@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 /**
- * The site's only navigation, at every width — the header shows just the
- * wordmark and this toggle, and the links live in the dropdown it opens.
+ * The site's navigation links, at every width — the header shows the wordmark,
+ * a sign-in button and this toggle, and the links live in the dropdown it opens.
  *
  * The panel spans the full width of the header it hangs from, with its contents
  * centred, and is sized to those contents rather than to the viewport.
