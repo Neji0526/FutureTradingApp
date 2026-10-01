@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Img } from "./Img";
-import { FEATURED_TRADER, MOSAIC_LEFT, MOSAIC_RIGHT, MOSAIC_MOBILE } from "./data";
+import { FACE_FOCUS, FEATURED_TRADER, MOSAIC_LEFT, MOSAIC_RIGHT, MOSAIC_MOBILE } from "./data";
 import { IconCheck, IconArrowRight, IconArrowUpRight } from "./icons";
 
 function Verified({ compact = false }: { compact?: boolean }) {
@@ -18,24 +18,61 @@ function Verified({ compact = false }: { compact?: boolean }) {
   );
 }
 
-/** Mild vertical stagger — matches the design mosaic without large empty gaps. */
-const LEFT_OFFSETS = ["mt-0", "mt-8", "mt-3", "mt-10", "mt-2", "mt-12"];
-const RIGHT_OFFSETS = ["mt-6", "mt-0", "mt-10", "mt-4", "mt-12", "mt-2"];
+/**
+ * Desktop mosaic geometry in design pixels, multiplied by `--s` on the
+ * container. Each side is three columns of two tiles, left to right; the
+ * outer columns sit highest and step down towards the featured trader.
+ */
+type MosaicCol = { w: number; top: number; h: [number, number] };
 
-function Tile({ src, offset }: { src: string; offset: string }) {
+const LEFT_COLS: MosaicCol[] = [
+  { w: 75, top: 11, h: [97, 119] },
+  { w: 75, top: 33, h: [102, 86] },
+  { w: 86, top: 55, h: [120, 97] },
+];
+const RIGHT_COLS: MosaicCol[] = [
+  { w: 87, top: 55, h: [97, 118] },
+  { w: 76, top: 33, h: [87, 107] },
+  { w: 76, top: 0, h: [118, 97] },
+];
+const FEATURED = { w: 154, h: 196, top: 27 };
+const GAP = 10;
+
+const px = (n: number) => `calc(var(--s) * ${n}px)`;
+
+function Tile({ src, w, h }: { src: string; w: number; h: number }) {
   return (
-    <div className={offset}>
-      <div className="relative overflow-hidden rounded-2xl">
-        <Img
-          src={src}
-          alt=""
-          label={src.split("/").pop()}
-          tone="dark"
-          sizes="(min-width: 1280px) 140px, 120px"
-          className="aspect-[3/4] w-full border-0 bg-transparent"
-        />
-        <Verified />
-      </div>
+    <div className="relative overflow-hidden rounded-2xl" style={{ width: px(w), height: px(h) }}>
+      <Img
+        src={src}
+        alt=""
+        label={src.split("/").pop()}
+        tone="dark"
+        position={FACE_FOCUS[src]}
+        sizes="(min-width: 1280px) 135px, 115px"
+        className="h-full w-full border-0 bg-transparent"
+      />
+      <Verified />
+    </div>
+  );
+}
+
+/** Fills columns top tile first, column by column. */
+function MosaicSide({ cols, srcs }: { cols: MosaicCol[]; srcs: string[] }) {
+  return (
+    <div className="flex shrink-0 items-start" style={{ gap: px(GAP) }}>
+      {cols.map((col, i) => (
+        <div
+          key={i}
+          className="flex flex-col"
+          style={{ marginTop: px(col.top), gap: px(GAP) }}
+        >
+          {col.h.map((h, j) => {
+            const src = srcs[i * 2 + j];
+            return src ? <Tile key={src} src={src} w={col.w} h={h} /> : null;
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -58,17 +95,20 @@ function Cta({ href, className }: { href: string; className?: string }) {
 }
 
 /**
- * Funded-trader wall.
- * Mobile / tablet: compact 3×2 grid (unchanged).
- * Desktop (lg+): centered featured trader with staggered mosaics either side.
+ * Funded-trader wall. One header (pill, heading, copy) at every width.
+ * Mobile / tablet: compact 3×2 grid with the CTA underneath.
+ * Desktop (lg+): CTA in the header, then the featured trader with staggered
+ * mosaics either side.
  */
 export function TopTraders({ ctaHref }: { ctaHref: string }) {
   return (
     <section id="traders" className="l-grid overflow-hidden py-14 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-[1180px] px-5 sm:px-8">
-        {/* Mobile / tablet header — keep current copy */}
-        <header className="mx-auto max-w-2xl text-center lg:hidden">
-          <h2 className="text-[clamp(1.8rem,4.6vw,3rem)] leading-[1.14] font-extrabold tracking-[-0.025em] text-white">
+        <header className="mx-auto max-w-2xl text-center">
+          <span className="inline-flex rounded-full border border-white/15 bg-white/[0.06] px-4 py-1.5 text-[12px] font-medium text-white/80 sm:text-[12.5px]">
+            Top Traders
+          </span>
+          <h2 className="mt-5 text-[clamp(1.8rem,4.6vw,3rem)] leading-[1.14] font-extrabold tracking-[-0.025em] text-white">
             Traders Who Scaled
             <br />
             <span className="l-serif font-normal">With The Vault</span>
@@ -76,11 +116,10 @@ export function TopTraders({ ctaHref }: { ctaHref: string }) {
           <p className="mx-auto mt-3 max-w-md text-[13.5px] leading-relaxed text-white/55 sm:text-[15px]">
             From first funding to $1,000,000 accounts. These traders proved it&rsquo;s possible.
           </p>
-        </header>
-
-        {/* Desktop header — light eyebrow only, mosaic is the hero */}
-        <header className="mx-auto hidden max-w-xl text-center lg:block">
-          <p className="l-serif text-[17px] text-white/55">it&rsquo;s possible.</p>
+          {/* Below lg the CTA sits under the compact grid instead. */}
+          <div className="mt-7 hidden justify-center lg:flex">
+            <Cta href={ctaHref} />
+          </div>
         </header>
 
         {/* Compact six-trader grid below lg — unchanged */}
@@ -92,6 +131,7 @@ export function TopTraders({ ctaHref }: { ctaHref: string }) {
                 alt=""
                 label={src.split("/").pop()}
                 tone="dark"
+                position={FACE_FOCUS[src]}
                 sizes="30vw"
                 className="aspect-[3/4] w-full border-0 bg-transparent"
               />
@@ -104,23 +144,28 @@ export function TopTraders({ ctaHref }: { ctaHref: string }) {
           <Cta href={ctaHref} className="px-5 py-2.5 text-[13px] sm:px-6 sm:py-3 sm:text-[14px]" />
         </div>
 
-        {/* Desktop mosaic — matches design: 3×2 each side + featured center */}
-        <div className="mt-10 hidden items-start justify-center gap-4 xl:gap-5 lg:flex">
-          <div className="grid w-[min(100%,380px)] shrink grid-cols-3 gap-3 xl:w-[420px] xl:gap-3.5">
-            {MOSAIC_LEFT.map((src, i) => (
-              <Tile key={src} src={src} offset={LEFT_OFFSETS[i] ?? "mt-0"} />
-            ))}
-          </div>
+        {/* Desktop mosaic — fan of 3×2 tiles each side + featured center */}
+        <div
+          className="mt-12 hidden items-start justify-center [--s:1.3] lg:flex xl:[--s:1.5]"
+          style={{ gap: px(16) }}
+        >
+          <MosaicSide cols={LEFT_COLS} srcs={MOSAIC_LEFT} />
 
-          <figure className="relative z-10 w-[240px] shrink-0 xl:w-[280px]">
-            <div className="relative overflow-hidden rounded-2xl border-[3px] border-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.55)]">
+          <figure
+            className="relative z-10 shrink-0"
+            style={{ width: px(FEATURED.w), marginTop: px(FEATURED.top) }}
+          >
+            <div
+              className="relative overflow-hidden rounded-2xl shadow-[0_20px_50px_-20px_rgba(0,0,0,0.55)]"
+              style={{ height: px(FEATURED.h) }}
+            >
               <Img
                 src={FEATURED_TRADER.src}
                 alt={FEATURED_TRADER.name}
                 label="trader-center.jpg"
                 tone="dark"
-                sizes="(min-width: 1280px) 280px, 240px"
-                className="aspect-[4/5] w-full border-0 bg-transparent"
+                sizes="(min-width: 1280px) 235px, 200px"
+                className="h-full w-full border-0 bg-transparent"
               />
               <span className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--l-blue-600)] p-2 text-white shadow-[0_2px_10px_rgba(0,0,0,0.35)]">
                 <IconArrowUpRight />
@@ -136,15 +181,7 @@ export function TopTraders({ ctaHref }: { ctaHref: string }) {
             </figcaption>
           </figure>
 
-          <div className="grid w-[min(100%,380px)] shrink grid-cols-3 gap-3 xl:w-[420px] xl:gap-3.5">
-            {MOSAIC_RIGHT.map((src, i) => (
-              <Tile key={src} src={src} offset={RIGHT_OFFSETS[i] ?? "mt-0"} />
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-12 hidden justify-center lg:flex">
-          <Cta href={ctaHref} />
+          <MosaicSide cols={RIGHT_COLS} srcs={MOSAIC_RIGHT} />
         </div>
       </div>
     </section>

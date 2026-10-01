@@ -12,6 +12,8 @@ export interface ImgProps {
   label?: string;
   /** `cover` fills and crops, `contain` fits the whole image in. */
   fit?: "cover" | "contain";
+  /** CSS `object-position` for the crop, e.g. "100% 40%" to keep a face in frame. */
+  position?: string;
   /**
    * Rendered width hint for the optimiser. Several source assets are multi-MB
    * originals (the headshots are ~2.9MB but draw at 44px), so an accurate
@@ -43,6 +45,7 @@ export function Img({
   alt,
   label,
   fit = "cover",
+  position,
   sizes = "100vw",
   className,
   imgClassName,
@@ -91,6 +94,7 @@ export function Img({
           sizes={sizes}
           priority={priority}
           onError={() => setFailed(true)}
+          style={position ? { objectPosition: position } : undefined}
           className={cn(fit === "cover" ? "object-cover" : "object-contain", imgClassName)}
         />
       )}
