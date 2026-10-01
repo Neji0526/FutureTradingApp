@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 /**
- * The site's navigation links, at every width — the header shows the wordmark,
- * a sign-in button and this toggle, and the links live in the dropdown it opens.
+ * The site's navigation links, at every width — the header shows the wordmark
+ * and this toggle; the links and the get-funded / sign-in buttons live in the
+ * dropdown it opens.
  *
  * The panel spans the full width of the header it hangs from, with its contents
  * centred, and is sized to those contents rather than to the viewport.
@@ -105,7 +106,7 @@ export function NavMenu({
               ))}
             </ul>
 
-            <div className="mt-9 flex justify-center">
+            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href={isAuthed ? homeHref : purchaseHref}
                 onClick={close}
@@ -113,6 +114,15 @@ export function NavMenu({
               >
                 {isAuthed ? "Go to portal" : "Get funded"}
               </Link>
+              {!isAuthed && (
+                <Link
+                  href="/login"
+                  onClick={close}
+                  className="rounded-full border border-[var(--l-ink)] px-7 py-[13px] text-[12.5px] font-bold tracking-[0.14em] text-[var(--l-ink)] uppercase transition-colors hover:bg-[var(--l-ink)] hover:text-white"
+                >
+                  Sign in
+                </Link>
+              )}
             </div>
           </div>
         </>
