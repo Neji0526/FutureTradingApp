@@ -11,8 +11,8 @@ export const NAV_LINKS = [
 ];
 
 /**
- * Sticky header: wordmark left; sign-in (or portal) button and menu toggle
- * right, at every width. The links live in <NavMenu>'s dropdown.
+ * Sticky header: wordmark left, menu toggle right, at every width. The links
+ * and the sign-in button live in <NavMenu>'s dropdown.
  */
 export function LandingNav({
   isAuthed,
@@ -34,20 +34,12 @@ export function LandingNav({
           The Vault
         </Link>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Link
-            href={isAuthed ? homeHref : "/login"}
-            className="rounded-full border border-[var(--l-ink)] px-4 py-2 text-[11.5px] font-bold tracking-[0.14em] text-[var(--l-ink)] uppercase transition-colors hover:bg-[var(--l-ink)] hover:text-white sm:px-5 sm:text-[12px]"
-          >
-            {isAuthed ? "Go to portal" : "Sign in"}
-          </Link>
-          <NavMenu
-            links={NAV_LINKS}
-            isAuthed={isAuthed}
-            homeHref={homeHref}
-            purchaseHref={purchaseHref}
-          />
-        </div>
+        <NavMenu
+          links={NAV_LINKS}
+          isAuthed={isAuthed}
+          homeHref={homeHref}
+          purchaseHref={purchaseHref}
+        />
       </nav>
     </header>
   );
