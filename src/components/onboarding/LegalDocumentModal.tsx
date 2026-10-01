@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { usePresence } from "./use-presence";
 
 const SCROLL_END_PX = 12;
+const TRANSITION_MS = 220;
 
 interface LegalDocumentModalProps {
   open: boolean;
@@ -26,6 +28,7 @@ export function LegalDocumentModal({
   const titleId = useId();
   const bodyRef = useRef<HTMLDivElement>(null);
   const [canAccept, setCanAccept] = useState(false);
+  const { mounted, shown } = usePresence(open, TRANSITION_MS);
 
   const measureScroll = useCallback(() => {
     const el = bodyRef.current;
@@ -38,12 +41,12 @@ export function LegalDocumentModal({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !mounted) return;
     setCanAccept(false);
     // Next frame so layout has the modal content measured.
     const id = requestAnimationFrame(() => measureScroll());
     return () => cancelAnimationFrame(id);
-  }, [open, body, measureScroll]);
+  }, [open, mounted, body, measureScroll]);
 
   useEffect(() => {
     if (!open) return;
@@ -59,14 +62,22 @@ export function LegalDocumentModal({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-6">
+    <div
+      className={[
+        "fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-6",
+        shown ? "" : "pointer-events-none",
+      ].join(" ")}
+    >
       <button
         type="button"
         aria-label="Close dialog"
-        className="absolute inset-0 bg-black/45"
+        className={[
+          "absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-[220ms] ease-out motion-reduce:transition-none",
+          shown ? "opacity-100" : "opacity-0",
+        ].join(" ")}
         onClick={onClose}
       />
 
@@ -74,7 +85,13 @@ export function LegalDocumentModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-[1] flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-[var(--l-line)] bg-white shadow-2xl sm:rounded-2xl"
+        className={[
+          "relative z-[1] flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-[var(--l-line)] bg-white shadow-2xl sm:rounded-2xl",
+          "transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+          shown
+            ? "translate-y-0 opacity-100 sm:scale-100"
+            : "translate-y-8 opacity-0 sm:translate-y-3 sm:scale-[0.97]",
+        ].join(" ")}
       >
         <header className="flex items-start justify-between gap-4 border-b border-[var(--l-line)] px-5 py-4 sm:px-6">
           <h2
@@ -95,11 +112,9 @@ export function LegalDocumentModal({
         <div
           ref={bodyRef}
           onScroll={measureScroll}
-          className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6"
+          className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7"
         >
-          <div className="space-y-3 whitespace-pre-wrap text-[13.5px] leading-relaxed text-[var(--l-body)]">
-            {body}
-          </div>
+          <LegalBody text={body} />
           {!canAccept && (
             <p className="sticky bottom-0 mt-6 bg-gradient-to-t from-white via-white to-transparent pt-8 pb-1 text-center text-[12px] font-medium text-[var(--l-body)]">
               Scroll to the end to enable Accept
@@ -122,12 +137,42 @@ export function LegalDocumentModal({
               if (!canAccept) return;
               onAccept();
             }}
-            className="l-cta rounded-lg px-6 py-2.5 text-[13.5px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
+            className="l-cta rounded-lg px-6 py-2.5 text-[13.5px] font-bold transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
           >
             Accept
           </button>
         </footer>
       </div>
+    </div>
+  );
+}
+
+/** "1. Title" lines become section headings, "6.1 Title" lines sub-headings. */
+function LegalBody({ text }: { text: string }) {
+  return (
+    <div className="space-y-2.5 text-[13.5px] leading-relaxed text-[var(--l-body)]">
+      {text.split("\n").map((raw, i) => {
+        const line = raw.trim();
+        if (!line) return null;
+        if (/^\d+\.\s/.test(line)) {
+          return (
+            <h3
+              key={i}
+              className="pt-4 text-[14.5px] font-bold tracking-[-0.01em] text-[var(--l-ink)] first:pt-0"
+            >
+              {line}
+            </h3>
+          );
+        }
+        if (/^\d+\.\d+\s/.test(line)) {
+          return (
+            <h4 key={i} className="pt-1.5 text-[13.5px] font-semibold text-[var(--l-ink)]">
+              {line}
+            </h4>
+          );
+        }
+        return <p key={i}>{line}</p>;
+      })}
     </div>
   );
 }

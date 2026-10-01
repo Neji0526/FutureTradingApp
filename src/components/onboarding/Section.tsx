@@ -2,6 +2,9 @@
 
 import type { ReactNode } from "react";
 import { IconCheck, IconChevron } from "./icons";
+import { usePresence } from "./use-presence";
+
+const PANEL_TRANSITION_MS = 300;
 
 /**
  * A collapsible section inside a step.
@@ -29,6 +32,7 @@ export function Section({
   const panelId = `onb-panel-${index}`;
   const headerId = `onb-header-${index}`;
   const expanded = alwaysOpen || open;
+  const { mounted, shown } = usePresence(expanded, PANEL_TRANSITION_MS);
 
   return (
     <section
@@ -74,7 +78,7 @@ export function Section({
             <span
               aria-hidden
               className={[
-                "h-4 w-4 shrink-0 text-[var(--l-body)] transition-transform",
+                "h-4 w-4 shrink-0 text-[var(--l-body)] transition-transform duration-300",
                 expanded ? "rotate-180" : "",
               ].join(" ")}
             >
@@ -84,9 +88,22 @@ export function Section({
         </button>
       </h3>
 
-      {expanded && (
-        <div id={panelId} aria-labelledby={headerId} className="border-t border-[var(--l-line)] px-5 py-6 sm:px-6">
-          {children}
+      {mounted && (
+        <div
+          className={[
+            "grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+            shown ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+          ].join(" ")}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div
+              id={panelId}
+              aria-labelledby={headerId}
+              className="border-t border-[var(--l-line)] px-5 py-6 sm:px-6"
+            >
+              {children}
+            </div>
+          </div>
         </div>
       )}
     </section>

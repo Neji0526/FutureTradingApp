@@ -9,7 +9,7 @@ import { STEPS } from "./data";
 import { IconCheck, IconLock } from "./icons";
 import { AccountFields } from "./AccountFields";
 import { LegalDocumentModal } from "./LegalDocumentModal";
-import { TERMS_AND_PRIVACY } from "./legal-content";
+import { USER_AGREEMENT } from "./legal-content";
 import { USE_MOCK_FEED } from "@/lib/constants";
 import { DxFeedOnboardingCredit } from "@/components/dxfeed/DxFeedChartCredit";
 
@@ -359,88 +359,6 @@ export function Wizard({
     }
   }
 
-  async function resetDxAgreement() {
-    if (USE_MOCK_FEED) {
-      setDx({
-        required: false,
-        signed: true,
-        link: null,
-        busy: false,
-        error: null,
-        awaitingSign: false,
-      });
-      return;
-    }
-    if (!identityReady) {
-      const e: Errors = {};
-      validateIdentityFields(e);
-      setErrors(e);
-      setOpen(1);
-      return;
-    }
-    const ok = window.confirm(
-      "Reset the market data agreement for this purchase? You can prepare and sign again without buying again.",
-    );
-    if (!ok) return;
-
-    persistForm();
-    setDx((d) => ({ ...d, busy: true, error: null }));
-    try {
-      const res = await fetch("/api/onboarding/dxfeed-agreement/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderNumber,
-          email: form.email.trim(),
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          country: form.country,
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        code?: string;
-        detail?: string;
-        hint?: string;
-        ok?: boolean;
-        agreementLink?: string | null;
-        agreementSigned?: boolean;
-      };
-      if (!res.ok) {
-        setDx((d) => ({
-          ...d,
-          busy: false,
-          error: formatDxAgreementError(data),
-        }));
-        return;
-      }
-      if (data.agreementLink) {
-        setDx({
-          required: true,
-          signed: data.agreementSigned === true,
-          link: data.agreementLink,
-          busy: false,
-          error: null,
-          awaitingSign: data.agreementSigned !== true,
-        });
-        setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
-        return;
-      }
-      setDx({
-        required: true,
-        signed: false,
-        link: null,
-        busy: false,
-        error: null,
-        awaitingSign: false,
-      });
-      setErrors((e) => (e.dxAgreement ? { ...e, dxAgreement: "" } : e));
-      await startDxAgreement();
-    } catch {
-      setDx((d) => ({ ...d, busy: false, error: "Could not reach the server. Try again." }));
-    }
-  }
-
   // Restore draft after dxFeed redirect (or refresh). Uses localStorage so a
   // redirect into a new tab still recovers name/email/password.
   useEffect(() => {
@@ -733,16 +651,6 @@ export function Wizard({
                             <span className="h-1.5 w-1.5 rounded-full bg-[var(--l-red)]" aria-hidden />
                             {dx.required ? "Signed" : "Not required"}
                           </span>
-                          {dx.required ? (
-                            <button
-                              type="button"
-                              disabled={dx.busy}
-                              onClick={() => void resetDxAgreement()}
-                              className="rounded-md px-2.5 py-1 text-[11.5px] font-semibold text-[var(--l-body)] underline-offset-2 hover:underline disabled:opacity-40"
-                            >
-                              {dx.busy ? "Working…" : "Reset & re-sign"}
-                            </button>
-                          ) : null}
                         </div>
                       ) : (
                         <div className="space-y-2.5">
@@ -785,14 +693,6 @@ export function Wizard({
                                 className="font-semibold text-[var(--l-body)] underline-offset-2 hover:underline disabled:opacity-40"
                               >
                                 Refresh link
-                              </button>
-                              <button
-                                type="button"
-                                disabled={dx.busy}
-                                onClick={() => void resetDxAgreement()}
-                                className="font-semibold text-[var(--l-body)] underline-offset-2 hover:underline disabled:opacity-40"
-                              >
-                                Reset &amp; re-sign
                               </button>
                             </div>
                           ) : null}
@@ -1103,8 +1003,8 @@ export function Wizard({
 
       <LegalDocumentModal
         open={legalDoc === "agreement"}
-        title="User agreement"
-        body={TERMS_AND_PRIVACY}
+        title="User Agreement"
+        body={USER_AGREEMENT}
         onClose={() => setLegalDoc(null)}
         onAccept={() => {
           set("acceptTerms", true);
@@ -1147,21 +1047,19 @@ function formatDxAgreementError(data: {
   error?: string;
   code?: string;
   detail?: string;
-  hint?: string;
 }): string {
   if (data.code === "already_exists") {
     return [
       data.error ??
         "A dxFeed / Volumetrica account or subscription already exists for this email.",
-      data.hint ??
-        "Use Reset & re-sign below, then Prepare again. Or Check status if you already signed.",
+      "If you already signed, refresh the page. Otherwise contact support.",
     ].join(" ");
   }
 
   const parts = [
     data.error ?? "Could not prepare the market data agreement.",
     data.detail ? `Details: ${data.detail}` : null,
-    data.hint ?? "Refresh the page and try again.",
+    "Refresh the page and try Prepare agreement again. If it keeps failing, contact support.",
   ].filter(Boolean);
   return parts.join(" ");
 }
