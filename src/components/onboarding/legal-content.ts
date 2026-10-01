@@ -1,5 +1,6 @@
 /** User Agreement shown in the onboarding accept modal. */
 
+// user agreement main rule
 export const USER_AGREEMENT = `
 Nextgen Solutions Management FZCO (trading as The Vault)
 Last updated: 31 July 2026
