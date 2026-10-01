@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { IconCheck, IconChevron } from "./icons";
-import { usePresence } from "./use-presence";
+import { usePresence } from "@/lib/use-presence";
 
 const PANEL_TRANSITION_MS = 300;
 

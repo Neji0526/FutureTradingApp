@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { usePresence } from "./use-presence";
+import { usePresence } from "@/lib/use-presence";
 
 const SCROLL_END_PX = 12;
 const TRANSITION_MS = 220;
