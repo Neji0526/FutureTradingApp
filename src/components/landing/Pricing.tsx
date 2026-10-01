@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CHALLENGE_PLANS, FUNDED_PLANS, type Plan } from "./data";
-import { IconCheck, IconInfo } from "./icons";
+import { IconArrowRight, IconCheck, IconInfo } from "./icons";
 
 /** Compact plan card — one screen at a time on mobile. */
 function PlanCard({
@@ -108,41 +108,127 @@ function PlanCard({
   );
 }
 
+/** Round prev/next button centred on the carousel's edge. */
+function CarouselArrow({
+  dir,
+  hidden,
+  onClick,
+}: {
+  dir: "prev" | "next";
+  hidden: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={dir === "prev" ? "Previous plans" : "Next plans"}
+      tabIndex={hidden ? -1 : 0}
+      aria-hidden={hidden}
+      className={[
+        "absolute top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--l-line)] bg-white text-[var(--l-ink)] shadow-[0_8px_24px_-10px_rgba(10,35,66,0.35)] transition-[opacity,background-color] duration-200 hover:bg-[var(--l-paper-2)] sm:flex",
+        dir === "prev" ? "left-0 -translate-x-1/2" : "right-0 translate-x-1/2",
+        hidden ? "pointer-events-none opacity-0" : "opacity-100",
+      ].join(" ")}
+    >
+      <span className={["h-4 w-4", dir === "prev" ? "rotate-180" : ""].join(" ")}>
+        <IconArrowRight />
+      </span>
+    </button>
+  );
+}
+
 function featuredFor(tab: "challenge" | "funded", index: number, plan: Plan): boolean {
   if (tab === "challenge") return index === 1;
   return plan.phase !== "Starter";
 }
 
-/** Pricing — mobile/tablet: 1 card at a time, swipe left/right for the rest. */
+/**
+ * Pricing — carousel below lg (one card per view) and for funded plans on lg+
+ * (three per view); the two challenge plans sit in a plain grid on lg+.
+ * Dots are scroll positions, so with three cards in view there are
+ * `plans - 2` of them.
+ */
 export function Pricing({ ctaHref }: { ctaHref: string }) {
   const [tab, setTab] = useState<"challenge" | "funded">("challenge");
   const [active, setActive] = useState(0);
+  const [positions, setPositions] = useState(CHALLENGE_PLANS.length);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const plans = tab === "challenge" ? CHALLENGE_PLANS : FUNDED_PLANS;
+
+  const slideWidth = useCallback(() => {
+    const slide = scrollerRef.current?.firstElementChild as HTMLElement | null;
+    return slide?.offsetWidth ?? 0;
+  }, []);
+
+  const measure = useCallback(() => {
+    const el = scrollerRef.current;
+    const w = slideWidth();
+    // Hidden scroller (challenge tab on lg+) has no width — nothing to page.
+    if (!el || w <= 0) return;
+    setPositions(Math.max(1, Math.round((el.scrollWidth - el.clientWidth) / w) + 1));
+  }, [slideWidth]);
 
   useEffect(() => {
     setActive(0);
     const el = scrollerRef.current;
     if (el) el.scrollTo({ left: 0, behavior: "instant" in el ? "instant" : "auto" });
-  }, [tab]);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [tab, measure]);
 
   function onScroll() {
     const el = scrollerRef.current;
-    if (!el) return;
-    const slide = el.firstElementChild as HTMLElement | null;
-    const width = slide?.offsetWidth ?? el.clientWidth;
-    if (width <= 0) return;
-    const idx = Math.round(el.scrollLeft / width);
-    setActive(Math.max(0, Math.min(plans.length - 1, idx)));
+    const w = slideWidth();
+    if (!el || w <= 0) return;
+    const idx = Math.round(el.scrollLeft / w);
+    setActive(Math.max(0, Math.min(positions - 1, idx)));
   }
 
   function goTo(i: number) {
     const el = scrollerRef.current;
-    if (!el) return;
-    const slide = el.children[i] as HTMLElement | undefined;
-    if (!slide) return;
-    el.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
-    setActive(i);
+    const w = slideWidth();
+    if (!el || w <= 0) return;
+    const next = Math.max(0, Math.min(positions - 1, i));
+    el.scrollTo({ left: next * w, behavior: "smooth" });
+    setActive(next);
+  }
+
+  // Mouse drag-to-scroll. Touch keeps the native swipe; a drag that moved
+  // swallows the click that follows so it doesn't trigger a card link.
+  const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null);
+  const suppressClick = useRef(false);
+  const [dragging, setDragging] = useState(false);
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    drag.current = { x: e.clientX, left: e.currentTarget.scrollLeft, moved: false };
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const d = drag.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    if (!d.moved) {
+      if (Math.abs(dx) < 5) return;
+      d.moved = true;
+      setDragging(true);
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    e.currentTarget.scrollLeft = d.left - dx;
+  }
+
+  function endDrag() {
+    const d = drag.current;
+    drag.current = null;
+    if (!d?.moved) return;
+    setDragging(false);
+    suppressClick.current = true;
+    window.setTimeout(() => (suppressClick.current = false), 0);
+    const el = scrollerRef.current;
+    const w = slideWidth();
+    if (el && w > 0) goTo(Math.round(el.scrollLeft / w));
   }
 
   return (
@@ -188,29 +274,59 @@ export function Pricing({ ctaHref }: { ctaHref: string }) {
           </div>
         </div>
 
-        {/* One card visible — swipe / scroll horizontally for the others */}
-        <div className="mt-7 lg:hidden">
-          <div
-            ref={scrollerRef}
-            onScroll={onScroll}
-            className="flex touch-pan-x snap-x snap-mandatory overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {plans.map((p, i) => (
-              <div
-                key={`${tab}-${p.phase}-${p.size}`}
-                className="w-full min-w-full shrink-0 grow-0 basis-full snap-start snap-always px-0.5"
-              >
-                <PlanCard
-                  plan={p}
-                  ctaHref={ctaHref}
-                  featured={featuredFor(tab, i, p)}
-                />
-              </div>
-            ))}
+        {/* Carousel — swipe, drag with the mouse, or use the arrows / dots */}
+        <div
+          className={[
+            "mt-7",
+            tab === "funded" ? "lg:mx-auto lg:mt-10 lg:max-w-5xl" : "lg:hidden",
+          ].join(" ")}
+        >
+          <div className="relative">
+            <CarouselArrow
+              dir="prev"
+              hidden={active <= 0}
+              onClick={() => goTo(active - 1)}
+            />
+            <CarouselArrow
+              dir="next"
+              hidden={active >= positions - 1}
+              onClick={() => goTo(active + 1)}
+            />
+            <div
+              ref={scrollerRef}
+              onScroll={onScroll}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              onClickCapture={(e) => {
+                if (!suppressClick.current) return;
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDragStart={(e) => e.preventDefault()}
+              className={[
+                "flex touch-pan-x overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] lg:-mx-3 [&::-webkit-scrollbar]:hidden",
+                dragging ? "cursor-grabbing snap-none select-none" : "snap-x snap-mandatory sm:cursor-grab",
+              ].join(" ")}
+            >
+              {plans.map((p, i) => (
+                <div
+                  key={`${tab}-${p.phase}-${p.size}`}
+                  className="w-full min-w-full shrink-0 grow-0 basis-full snap-start snap-always px-0.5 lg:w-1/3 lg:min-w-0 lg:basis-1/3 lg:px-3"
+                >
+                  <PlanCard
+                    plan={p}
+                    ctaHref={ctaHref}
+                    featured={featuredFor(tab, i, p)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-center gap-2">
-            {plans.map((p, i) => (
+          <div className="mt-4 flex items-center justify-center gap-2 lg:mt-7">
+            {plans.slice(0, positions).map((p, i) => (
               <button
                 key={`${tab}-${p.phase}-${p.size}-dot`}
                 type="button"
@@ -226,29 +342,24 @@ export function Pricing({ ctaHref }: { ctaHref: string }) {
               />
             ))}
           </div>
-          <p className="mt-2 text-center text-[11px] text-[var(--l-body)]">
+          <p className="mt-2 text-center text-[11px] text-[var(--l-body)] lg:hidden">
             Swipe left or right for more plans
           </p>
         </div>
 
-        {/* Large screens: grid */}
-        <div
-          className={[
-            "mx-auto mt-10 hidden gap-6 lg:grid",
-            tab === "challenge"
-              ? "max-w-3xl grid-cols-2"
-              : "max-w-5xl grid-cols-3",
-          ].join(" ")}
-        >
-          {plans.map((p, i) => (
-            <PlanCard
-              key={`${p.phase}-${p.size}`}
-              plan={p}
-              ctaHref={ctaHref}
-              featured={featuredFor(tab, i, p)}
-            />
-          ))}
-        </div>
+        {/* Large screens, challenge plans: two-card grid */}
+        {tab === "challenge" && (
+          <div className="mx-auto mt-10 hidden max-w-3xl grid-cols-2 gap-6 lg:grid">
+            {plans.map((p, i) => (
+              <PlanCard
+                key={`${p.phase}-${p.size}`}
+                plan={p}
+                ctaHref={ctaHref}
+                featured={featuredFor(tab, i, p)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
