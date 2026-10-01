@@ -351,7 +351,7 @@ export const FEATURED_TRADER = {
   role: "Top funded trader",
 };
 
-/** Tiles either side of the featured trader, left column first. */
+/** Tiles either side of the featured trader: left to right, top tile of each column first. */
 export const MOSAIC_LEFT = [
   "/landing/trader-photo-3.jpeg",
   "/landing/trader-photo-4.jpeg",
@@ -369,6 +369,25 @@ export const MOSAIC_RIGHT = [
   "/landing/trader-photo-1.jpeg",
   "/landing/trader-photo-2.jpeg",
 ];
+
+/**
+ * Crop focus per trader photo (CSS object-position) so the face stays in
+ * frame when a square or portrait original is cut down to a narrow tile.
+ */
+export const FACE_FOCUS: Record<string, string> = {
+  "/landing/trader-photo-0.jpeg": "100% 40%",
+  "/landing/trader-photo-1.jpeg": "100% 30%",
+  "/landing/trader-photo-2.jpeg": "40% 50%",
+  "/landing/trader-photo-3.jpeg": "100% 50%",
+  "/landing/trader-photo-4.jpeg": "0% 40%",
+  "/landing/trader-photo-5.jpeg": "75% 50%",
+  "/landing/trader-photo-6.jpg": "100% 50%",
+  "/landing/trader-photo-7.jpg": "50% 45%",
+  "/landing/trader-photo-8.jpg": "60% 50%",
+  "/landing/trader-photo-9.jpg": "85% 45%",
+  "/landing/trader-photo-10.jpg": "40% 35%",
+  "/landing/trader-bl.jpg": "40% 35%",
+};
 
 /** Mobile trader wall — only the six portraits shown in the compact layout. */
 export const MOSAIC_MOBILE = [
