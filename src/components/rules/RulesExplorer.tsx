@@ -1,8 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { GROUPS, type Group, type Topic } from "./data";
 import { GROUP_ICONS, TOPIC_ICONS, IconArrowRight } from "./icons";
+import { usePresence } from "@/lib/use-presence";
+
+const PANEL_TRANSITION_MS = 400;
 
 /** One selectable group card. Reads "View rules" until open, then "Close". */
 function GroupCard({
@@ -52,9 +55,29 @@ function GroupCard({
   );
 }
 
+function Bullet({ children }: { children: ReactNode }) {
+  return (
+    <li className="flex gap-3 text-[13.5px] leading-relaxed text-[var(--l-body)]">
+      <span
+        aria-hidden
+        className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--l-blue-500)]"
+      />
+      <span>{children}</span>
+    </li>
+  );
+}
+
 /** A topic row that expands to reveal its rule text. */
-function TopicRow({ topic }: { topic: Topic }) {
-  const [open, setOpen] = useState(false);
+function TopicRow({
+  topic,
+  open,
+  onToggle,
+}: {
+  topic: Topic;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { mounted, shown } = usePresence(open, PANEL_TRANSITION_MS);
   const Icon = TOPIC_ICONS[topic.icon];
   const panelId = `topic-${topic.id}`;
 
@@ -62,7 +85,7 @@ function TopicRow({ topic }: { topic: Topic }) {
     <li className="overflow-hidden rounded-lg border border-[var(--l-line)] bg-white">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={onToggle}
         aria-expanded={open}
         aria-controls={panelId}
         className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left sm:px-5"
@@ -80,51 +103,43 @@ function TopicRow({ topic }: { topic: Topic }) {
           <span className="absolute top-1/2 left-0 h-[1.5px] w-4 -translate-y-1/2 rounded bg-current" />
           <span
             className={[
-              "absolute top-0 left-1/2 h-4 w-[1.5px] -translate-x-1/2 rounded bg-current transition-opacity",
-              open ? "opacity-0" : "opacity-100",
+              "absolute top-0 left-1/2 h-4 w-[1.5px] -translate-x-1/2 rounded bg-current transition-[opacity,transform] duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+              open ? "rotate-90 opacity-0" : "rotate-0 opacity-100",
             ].join(" ")}
           />
         </span>
       </button>
 
-      {open && (
-        <div id={panelId} className="border-t border-[var(--l-line)] px-4 py-5 sm:px-5">
-          <p className="text-[13.5px] leading-relaxed text-[var(--l-body)] sm:text-[14.5px]">
-            {topic.body}
-          </p>
+      {mounted && (
+        <div
+          className={[
+            "grid transition-[grid-template-rows,opacity] duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+            shown ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+          ].join(" ")}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div id={panelId} className="border-t border-[var(--l-line)] px-4 py-5 sm:px-5">
+              {topic.body && (
+                <p className="text-[13.5px] leading-relaxed text-[var(--l-body)] sm:text-[14.5px]">
+                  {topic.body}
+                </p>
+              )}
 
-          {topic.points && (
-            <ul className="mt-4 space-y-2.5">
-              {topic.points.map((p) => (
-                <li key={p} className="flex gap-3 text-[13.5px] leading-relaxed text-[var(--l-body)]">
-                  <span
-                    aria-hidden
-                    className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--l-blue-500)]"
-                  />
-                  {p}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {topic.facts && (
-            <dl className="mt-5 overflow-hidden rounded-lg border border-[var(--l-line)]">
-              {topic.facts.map((f, i) => (
-                <div
-                  key={f.label}
-                  className={[
-                    "flex flex-col gap-0.5 px-4 py-2.5 xs:flex-row xs:items-center xs:justify-between xs:gap-4",
-                    i % 2 ? "bg-white" : "bg-[var(--l-paper-2)]",
-                  ].join(" ")}
-                >
-                  <dt className="text-[12.5px] text-[var(--l-body)]">{f.label}</dt>
-                  <dd className="nums text-[12.5px] font-bold text-[var(--l-ink)] xs:text-right">
-                    {f.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          )}
+              {(topic.facts || topic.points) && (
+                <ul className={["space-y-2.5", topic.body ? "mt-4" : ""].join(" ")}>
+                  {topic.facts?.map((f) => (
+                    <Bullet key={f.label}>
+                      <span className="font-semibold text-[var(--l-ink)]">{f.label}:</span>{" "}
+                      {f.value}
+                    </Bullet>
+                  ))}
+                  {topic.points?.map((p) => (
+                    <Bullet key={p}>{p}</Bullet>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </li>
@@ -134,13 +149,14 @@ function TopicRow({ topic }: { topic: Topic }) {
 /**
  * Rules browser: pick a group above, then expand the topics that appear below.
  *
- * Each topic keeps its own open state, so several can be read at once and a
- * topic collapses back when its group is closed and reopened. Choosing a group
- * moves focus to the panel, so keyboard and screen-reader users are taken to
- * the content they just asked for rather than being left on the card.
+ * Only one topic is open at a time: opening a topic closes the previous one,
+ * and switching groups collapses everything. Choosing a group moves focus to
+ * the panel, so keyboard and screen-reader users are taken to the content
+ * they just asked for rather than being left on the card.
  */
 export function RulesExplorer() {
   const [selected, setSelected] = useState<string | null>(null);
+  const [openTopic, setOpenTopic] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const group = GROUPS.find((g) => g.id === selected) ?? null;
@@ -148,6 +164,7 @@ export function RulesExplorer() {
   function choose(id: string) {
     const next = id === selected ? null : id;
     setSelected(next);
+    setOpenTopic(null);
     if (next) requestAnimationFrame(() => panelRef.current?.focus());
   }
 
@@ -167,8 +184,8 @@ export function RulesExplorer() {
         className="mt-6 scroll-mt-24 outline-none sm:mt-8"
       >
         {group ? (
-          /* `key` remounts the panel per group, which resets every topic to
-             collapsed instead of carrying one group's open rows into the next. */
+          /* `key` remounts the panel per group so no closing animation from the
+             previous group carries over. */
           <section
             key={group.id}
             className="rounded-xl border border-[var(--l-line)] bg-white p-5 sm:p-8"
@@ -179,7 +196,12 @@ export function RulesExplorer() {
 
             <ul className="mt-5 space-y-3 sm:mt-6">
               {group.topics.map((t) => (
-                <TopicRow key={t.id} topic={t} />
+                <TopicRow
+                  key={t.id}
+                  topic={t}
+                  open={openTopic === t.id}
+                  onToggle={() => setOpenTopic((cur) => (cur === t.id ? null : t.id))}
+                />
               ))}
             </ul>
           </section>
