@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { usePresence } from "@/lib/use-presence";
+import { IconClose } from "./icons";
 
 const SCROLL_END_PX = 12;
 const TRANSITION_MS = 220;
@@ -86,14 +87,14 @@ export function LegalDocumentModal({
         aria-modal="true"
         aria-labelledby={titleId}
         className={[
-          "relative z-[1] flex max-h-[92vh] w-full max-w-5xl flex-col sm:h-[90vh] overflow-hidden rounded-t-2xl border border-[var(--l-line)] bg-white shadow-2xl sm:rounded-2xl",
+          "relative z-[1] flex max-h-[92vh] w-full flex-col overflow-hidden sm:h-full sm:max-h-none sm:max-w-[1800px] rounded-t-2xl border border-[var(--l-line)] bg-white shadow-2xl sm:rounded-2xl",
           "transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
           shown
             ? "translate-y-0 opacity-100 sm:scale-100"
             : "translate-y-8 opacity-0 sm:translate-y-3 sm:scale-[0.97]",
         ].join(" ")}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-[var(--l-line)] px-5 py-4 sm:px-8">
+        <header className="flex items-center justify-between gap-4 border-b border-[var(--l-line)] px-5 py-4 sm:px-8">
           <h2
             id={titleId}
             className="text-[17px] font-extrabold tracking-[-0.02em] text-[var(--l-ink)]"
@@ -103,9 +104,11 @@ export function LegalDocumentModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-[13px] font-semibold text-[var(--l-body)] hover:bg-[var(--l-paper-2)] hover:text-[var(--l-ink)]"
+            aria-label="Close"
+            title="Close"
+            className="-my-1 -mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg p-2 text-[var(--l-body)] transition-colors hover:bg-[var(--l-paper-2)] hover:text-[var(--l-ink)]"
           >
-            Close
+            <IconClose />
           </button>
         </header>
 
