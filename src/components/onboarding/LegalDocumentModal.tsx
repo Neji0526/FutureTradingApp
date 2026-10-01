@@ -86,14 +86,14 @@ export function LegalDocumentModal({
         aria-modal="true"
         aria-labelledby={titleId}
         className={[
-          "relative z-[1] flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-[var(--l-line)] bg-white shadow-2xl sm:rounded-2xl",
+          "relative z-[1] flex max-h-[92vh] w-full max-w-5xl flex-col sm:h-[90vh] overflow-hidden rounded-t-2xl border border-[var(--l-line)] bg-white shadow-2xl sm:rounded-2xl",
           "transition-[opacity,transform] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
           shown
             ? "translate-y-0 opacity-100 sm:scale-100"
             : "translate-y-8 opacity-0 sm:translate-y-3 sm:scale-[0.97]",
         ].join(" ")}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-[var(--l-line)] px-5 py-4 sm:px-6">
+        <header className="flex items-start justify-between gap-4 border-b border-[var(--l-line)] px-5 py-4 sm:px-8">
           <h2
             id={titleId}
             className="text-[17px] font-extrabold tracking-[-0.02em] text-[var(--l-ink)]"
@@ -112,7 +112,7 @@ export function LegalDocumentModal({
         <div
           ref={bodyRef}
           onScroll={measureScroll}
-          className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7"
+          className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6 lg:px-10"
         >
           <LegalBody text={body} />
           {!canAccept && (
@@ -122,7 +122,7 @@ export function LegalDocumentModal({
           )}
         </div>
 
-        <footer className="flex items-center justify-end gap-3 border-t border-[var(--l-line)] px-5 py-4 sm:px-6">
+        <footer className="flex items-center justify-end gap-3 border-t border-[var(--l-line)] px-5 py-4 sm:px-8">
           <button
             type="button"
             onClick={onClose}
