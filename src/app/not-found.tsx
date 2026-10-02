@@ -45,7 +45,7 @@ export default async function NotFound() {
             address, or head back to somewhere familiar.
           </p>
 
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-9 flex justify-center">
             <Link
               href={isAuthed ? portalHref : "/"}
               className="l-cta inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-[14px] font-bold text-white!"
@@ -54,12 +54,6 @@ export default async function NotFound() {
               <span className="h-4 w-4">
                 <IconArrowRight />
               </span>
-            </Link>
-            <Link
-              href="/rules"
-              className="inline-flex items-center rounded-xl border border-white/25 px-6 py-3.5 text-[14px] font-bold text-white! transition-colors hover:border-white/50 hover:bg-white/[0.06]"
-            >
-              Trading rules
             </Link>
           </div>
         </div>
